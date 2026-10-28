@@ -1,0 +1,200 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة الدخول | النظام</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- ربط ملف الإعدادات -->
+    <script src="config.js"></script>
+    <style>
+        :root {
+            --primary-bg: #0f172a; --surface-bg: #1e293b; --primary-color: #10b981;
+            --accent-color: #3b82f6; --warning-color: #f59e0b; --danger-color: #ef4444;
+            --text-main: #f8fafc; --text-muted: #94a3b8; --border-color: #334155; 
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font-family); background-color: var(--primary-bg); color: var(--text-main); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+
+        /* شاشة الدخول */
+        #loginScreen { background: var(--surface-bg); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; width: 100%; max-width: 400px; border: 1px solid var(--border-color); }
+        #loginScreen h1 { color: var(--primary-color); margin-bottom: 10px; font-size: 2rem; }
+        #loginScreen p { color: var(--text-muted); margin-bottom: 25px; }
+        .input-group { margin-bottom: 20px; }
+        .input-group input { width: 100%; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--primary-bg); color: white; font-size: 1.2rem; text-align: center; letter-spacing: 5px; outline: none; }
+        .input-group input:focus { border-color: var(--primary-color); }
+        .btn-login { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-login:hover { background: #059669; }
+        .error-msg { color: var(--danger-color); margin-top: 15px; font-weight: bold; display: none; }
+
+        /* شاشة الديسك توب */
+        #desktopScreen { display: none; width: 100%; max-width: 1200px; padding: 20px; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .desktop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+        .desktop-header h1 { color: var(--text-main); font-size: 1.8rem; display: flex; align-items: center; gap: 15px;}
+        .desktop-header h1 img { height: 50px; background: #fff; padding: 5px 10px; border-radius: 8px; }
+        .logout-btn { background: transparent; color: var(--danger-color); border: 1px solid var(--danger-color); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .logout-btn:hover { background: var(--danger-color); color: white; }
+
+        .apps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; }
+        .app-icon { 
+            background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 16px; 
+            padding: 30px 20px; text-align: center; cursor: pointer; transition: 0.3s; 
+            display: flex; flex-direction: column; align-items: center; gap: 15px; text-decoration: none; color: var(--text-main);
+        }
+        .app-icon:hover { transform: translateY(-5px); border-color: var(--primary-color); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.1); }
+        .app-icon .icon { font-size: 3rem; }
+        .app-icon .name { font-size: 1.2rem; font-weight: bold; }
+        
+        .app-icon.locked .icon { opacity: 0.5; }
+        .app-icon.locked::after { content: '🔒'; font-size: 1.5rem; position: absolute; margin-top: -10px; margin-right: -10px; }
+
+        /* شاشة الباسورد السرية للداش بورد */
+        #secretModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .secret-box { background: var(--surface-bg); padding: 30px; border-radius: 16px; text-align: center; width: 90%; max-width: 350px; border: 1px solid var(--danger-color); }
+        .secret-box h2 { color: var(--danger-color); margin-bottom: 20px; }
+        .secret-box input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--primary-bg); color: white; text-align: center; font-size: 1.1rem; margin-bottom: 15px; outline: none; }
+        .secret-box button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 48%; }
+        .btn-confirm { background: var(--danger-color); color: white; }
+        .btn-cancel { background: var(--border-color); color: var(--text-main); }
+    </style>
+</head>
+<body>
+
+    <!-- شاشة الدخول للموظف -->
+    <div id="loginScreen">
+        <h1 id="loginLabName">🔬 جاري التحميل...</h1>
+        <p>أدخل باسورد الموظف للدخول إلى النظام</p>
+        <div class="input-group">
+            <input type="password" id="empPassword" placeholder="******" autocomplete="off">
+        </div>
+        <button class="btn-login" onclick="checkEmployeePassword()">دخول للنظام</button>
+        <div class="error-msg" id="loginError">❌ الباسورد غلط</div>
+    </div>
+
+    <!-- شاشة الديسك توب -->
+    <div id="desktopScreen">
+        <div class="desktop-header">
+            <h1>🖥️ النظام الرئيسي - <span id="desktopLabName"></span></h1>
+            <button class="logout-btn" onclick="logout()">خروج</button>
+        </div>
+        
+        <div class="apps-grid">
+            <!-- الاستقبال -->
+            <a href="reception.html" class="app-icon">
+                <div class="icon">🏥</div>
+                <div class="name">الاستقبال</div>
+            </a>
+            
+            <!-- المعمل -->
+            <a href="lab.html" class="app-icon">
+                <div class="icon">🔬</div>
+                <div class="name">المعمل</div>
+            </a>
+
+            <!-- إدارة التحاليل -->
+            <a href="tests_manage.html" class="app-icon">
+                <div class="icon">⚙️</div>
+                <div class="name">إدارة التحاليل</div>
+            </a>
+
+            <!-- الداش بورد -->
+            <div class="app-icon locked" onclick="openSecretModal()">
+                <div class="icon">📊</div>
+                <div class="name">لوحة التحكم</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- شاشة الباسورد السرية للدكتور -->
+    <div id="secretModal">
+        <div class="secret-box">
+            <h2>🔒 منطقة محظورة</h2>
+            <p style="color:var(--text-muted); margin-bottom:15px; font-size:0.9rem;">هذه الشاشة مخصصة للدكتور فقط.</p>
+            <input type="password" id="docPassword" placeholder="باسورد الدكتور">
+            <div style="display:flex; justify-content:space-between;">
+                <button class="btn-confirm" onclick="checkDoctorPassword()">دخول</button>
+                <button class="btn-cancel" onclick="closeSecretModal()">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. قراءة بيانات المعمل من ملف الـ config وعرضها
+        document.addEventListener("DOMContentLoaded", function() {
+            if (typeof TEBA_CONFIG !== 'undefined') {
+                document.title = "بوابة الدخول | " + TEBA_CONFIG.lab.name;
+                document.getElementById('loginLabName').innerText = "🔬 " + TEBA_CONFIG.lab.name;
+                document.getElementById('desktopLabName').innerText = TEBA_CONFIG.lab.name;
+            }
+        });
+
+        // 2. الباسوردات من config
+        const EMP_PASS = TEBA_CONFIG.auth.employeePassword;
+        const DOC_PASS = TEBA_CONFIG.auth.doctorPassword;
+
+        // 3. التحقق من باسورد الموظف
+        function checkEmployeePassword() {
+            const input = document.getElementById('empPassword').value;
+            const error = document.getElementById('loginError');
+            
+            if (input === EMP_PASS) {
+                // حفظ جلسة الموظف
+                sessionStorage.setItem('emp_logged', 'yes');
+                
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('desktopScreen').style.display = 'block';
+                error.style.display = 'none';
+            } else {
+                error.style.display = 'block';
+                document.getElementById('empPassword').value = '';
+            }
+        }
+
+        // 4. فتح شاشة باسورد الدكتور
+        function openSecretModal() {
+            document.getElementById('secretModal').style.display = 'flex';
+            document.getElementById('docPassword').focus();
+        }
+
+        function closeSecretModal() {
+            document.getElementById('secretModal').style.display = 'none';
+            document.getElementById('docPassword').value = '';
+        }
+
+        // 5. التحقق من باسورد الدكتور
+        function checkDoctorPassword() {
+            const input = document.getElementById('docPassword').value;
+            
+            if (input === DOC_PASS) {
+                // حفظ تصريح الدخول للداش بورد
+                sessionStorage.setItem('doctor_access', 'granted');
+                window.location.href = 'admin.html';
+            } else {
+                alert('❌ باسورد الدكتور غلط!');
+                document.getElementById('docPassword').value = '';
+            }
+        }
+
+        // 6. تسجيل الخروج
+        function logout() {
+            sessionStorage.removeItem('emp_logged');
+            sessionStorage.removeItem('doctor_access');
+            document.getElementById('desktopScreen').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('empPassword').value = '';
+        }
+
+        // إتاحة الدخول بزرار Enter
+        document.getElementById('empPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') checkEmployeePassword();
+        });
+        
+        document.getElementById('docPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') checkDoctorPassword();
+        });
+    </script>
+</body>
+</html>
