@@ -500,9 +500,7 @@
       _mergedCache.combined = combinedList;
       return combinedList;
     }
-  }
-
-  /* ==============================================================
+  }  /* ==============================================================
      الدوال الجديدة الخاصة بالمطابقة واللايف (المرحلة 6 و 7)
      ============================================================== */
   window.renderReconciliation = async function() {
@@ -648,26 +646,66 @@
     const elPending = document.getElementById('live-pending');
     const elPublished = document.getElementById('live-published');
     if(elCases) elCases.innerText = '...'; if(elTests) elTests.innerText = '...'; if(elPending) elPending.innerText = '...'; if(elPublished) elPublished.innerText = '...';
+    
+    const branchFilter = document.getElementById('liveBranchSelector') ? document.getElementById('liveBranchSelector').value : 'combined';
+
     try {
       const today = new Date(); today.setHours(0,0,0,0); const todayISO = today.toISOString();
-      const { count: casesCount } = await _supabase.from('visits').select('*', { count: 'exact', head: true }).gte('visit_date', todayISO);
-      const { data: todayVisits } = await _supabase.from('visits').select('visit_id').gte('visit_date', todayISO);
+      
+      let casesQuery = _supabase.from('visits').select('*', { count: 'exact', head: true }).gte('visit_date', todayISO);
+      let visitsQuery = _supabase.from('visits').select('visit_id').gte('visit_date', todayISO);
+      
+      if (branchFilter === 'jaafara') {
+        casesQuery = casesQuery.eq('branch_id', 1);
+        visitsQuery = visitsQuery.eq('branch_id', 1);
+      } else if (branchFilter === 'bahtim') {
+        casesQuery = casesQuery.eq('branch_id', 2);
+        visitsQuery = visitsQuery.eq('branch_id', 2);
+      }
+
+      const { count: casesCount } = await casesQuery;
+      const { data: todayVisits } = await visitsQuery;
+      
       let testsCount = 0;
       if (todayVisits && todayVisits.length > 0) {
         const vIds = todayVisits.map(v => v.visit_id);
         const { count: tCount } = await _supabase.from('visit_tests').select('*', { count: 'exact', head: true }).in('visit_id', vIds);
         testsCount = tCount || 0;
       }
-      const { data: allVT } = await _supabase.from('visit_tests').select('id');
-      const { data: allRes } = await _supabase.from('test_results').select('visit_test_id');
-      const resIds = new Set((allRes || []).map(r => r.visit_test_id));
-      const pendingCount = (allVT || []).filter(vt => !resIds.has(vt.id)).length;
-      const { count: pubCount } = await _supabase.from('visits').select('*', { count: 'exact', head: true }).eq('is_published', true).gte('published_at', todayISO);
+
+      let pendingCount = 0;
+      if (branchFilter === 'combined') {
+        const { data: allVT } = await _supabase.from('visit_tests').select('id');
+        const { data: allRes } = await _supabase.from('test_results').select('visit_test_id');
+        const resIds = new Set((allRes || []).map(r => r.visit_test_id));
+        pendingCount = (allVT || []).filter(vt => !resIds.has(vt.id)).length;
+      } else {
+        const bId = branchFilter === 'jaafara' ? 1 : 2;
+        const { data: branchVisits } = await _supabase.from('visits').select('visit_id').eq('branch_id', bId);
+        const bvIds = (branchVisits || []).map(v => v.visit_id);
+        if (bvIds.length > 0) {
+          const { data: allVT } = await _supabase.from('visit_tests').select('id').in('visit_id', bvIds);
+          const vtIds = (allVT || []).map(v => v.id);
+          if (vtIds.length > 0) {
+            const { data: allRes } = await _supabase.from('test_results').select('visit_test_id').in('visit_test_id', vtIds);
+            const resIds = new Set((allRes || []).map(r => r.visit_test_id));
+            pendingCount = (allVT || []).filter(vt => !resIds.has(vt.id)).length;
+          }
+        }
+      }
+
+      let pubQuery = _supabase.from('visits').select('*', { count: 'exact', head: true }).eq('is_published', true).gte('published_at', todayISO);
+      if (branchFilter === 'jaafara') pubQuery = pubQuery.eq('branch_id', 1);
+      if (branchFilter === 'bahtim') pubQuery = pubQuery.eq('branch_id', 2);
+      const { count: pubCount } = await pubQuery;
+
       if(elCases) elCases.innerText = casesCount || 0;
       if(elTests) elTests.innerText = testsCount;
       if(elPending) elPending.innerText = pendingCount;
       if(elPublished) elPublished.innerText = pubCount || 0;
+      
     } catch (err) {
+      console.error("Live Stats Error:", err);
       if(elCases) elCases.innerText = '!'; if(elTests) elTests.innerText = '!'; if(elPending) elPending.innerText = '!'; if(elPublished) elPublished.innerText = '!';
     }
   };
