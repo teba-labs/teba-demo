@@ -7,82 +7,117 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <style>
+        /* ألوان مستوحاة من الداش بورد والموقع بتاعك */
         :root {
-            --primary-bg: #f0fdf4; --surface-bg: #ffffff; --primary-color: #0a6847;
-            --accent-color: #3498db; --warning-color: #f39c12; --danger-color: #ef4444;
-            --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0; 
-            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --bg: #0a0e0a; 
+            --bg-darker: #050805;
+            --surface: #12181a;
+            --primary: #00ff7f; /* الأخضر النيون */
+            --primary-dark: #15803d;
+            --text: #e8f0e8;
+            --text-muted: #a8b5a8;
+            --border: rgba(0, 255, 127, 0.15);
+            --border-glow: rgba(0, 255, 127, 0.4);
+            --font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font-family); background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); color: var(--text-main); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        body { 
+            font-family: var(--font); 
+            background-color: var(--bg); 
+            background-image: radial-gradient(circle at 15% 10%, rgba(0, 255, 127, .08), transparent 40%), radial-gradient(circle at 85% 80%, rgba(0, 255, 127, .05), transparent 40%);
+            color: var(--text); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; 
+        }
 
         /* شاشة الدخول (الباسورد) */
-        #loginScreen { background: var(--surface-bg); padding: 40px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); text-align: center; width: 100%; max-width: 420px; border: 1px solid var(--border-color); position: relative; overflow: hidden; }
-        #loginScreen::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, var(--primary-color), var(--accent-color)); }
-        #loginScreen h1 { color: var(--primary-color); margin-bottom: 10px; font-size: 2rem; font-weight: 800;}
-        #loginScreen p { color: var(--text-muted); margin-bottom: 30px; font-weight: 600;}
+        #loginScreen { 
+            background: var(--surface); padding: 40px; border-radius: 24px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(0,255,127,0.1); 
+            text-align: center; width: 100%; max-width: 400px; border: 1px solid var(--border); 
+        }
+        #loginScreen h1 { color: var(--primary); margin-bottom: 10px; font-size: 2rem; font-weight: 900; text-shadow: 0 0 15px rgba(0,255,127,0.3);}
+        #loginScreen p { color: var(--text-muted); margin-bottom: 30px; font-weight: 600; font-size: 0.95rem;}
+        
         .input-group { margin-bottom: 25px; }
-        .input-group input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border-color); background: #f8fafc; color: var(--text-main); font-size: 1.2rem; text-align: center; letter-spacing: 5px; outline: none; transition: 0.3s;}
-        .input-group input:focus { border-color: var(--primary-color); background: white; box-shadow: 0 0 0 4px rgba(10,104,71,0.1); }
-        .btn-login { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(10,104,71,0.3);}
-        .btn-login:hover { background: #085a3d; transform: translateY(-2px); }
-        .error-msg { color: var(--danger-color); margin-top: 15px; font-weight: bold; display: none; }
+        .input-group input { 
+            width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border); 
+            background: var(--bg-darker); color: var(--primary); font-size: 1.5rem; text-align: center; 
+            letter-spacing: 8px; outline: none; transition: 0.3s; font-weight: bold;
+        }
+        .input-group input:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(0,255,127,0.2); }
+        
+        .btn-login { 
+            width: 100%; padding: 15px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); 
+            color: var(--bg); border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 900; 
+            cursor: pointer; transition: 0.3s; box-shadow: 0 0 20px rgba(0,255,127,0.3);
+        }
+        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(0,255,127,0.5); }
+        .error-msg { color: #ef4444; margin-top: 15px; font-weight: bold; display: none; }
 
         /* شاشة الديسك توب */
-        #desktopScreen { display: none; width: 100%; max-width: 1000px; padding: 30px; animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        #desktopScreen { display: none; width: 100%; max-width: 900px; padding: 20px; animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
-        .desktop-header { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 50px; text-align: center; position: relative;}
+        .desktop-header { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 40px; text-align: center; position: relative;}
         
         /* اللوجو */
-        .logo-container { background: white; padding: 15px 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border-color); transition: 0.3s;}
-        .logo-container:hover { transform: scale(1.02); }
-        .logo-container img { height: 80px; width: auto; object-fit: contain; display: block; }
-        
-        .desktop-header h1 { color: var(--primary-color); font-size: 2rem; font-weight: 900; margin-bottom: 5px; }
-        .desktop-header p { color: var(--text-muted); font-size: 1.1rem; font-weight: 600; }
-        
-        .logout-btn { position: absolute; top: 0; left: 0; background: #fee2e2; color: var(--danger-color); border: 1px solid #fecaca; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.95rem;}
-        .logout-btn:hover { background: var(--danger-color); color: white; }
-
-        /* الكروت (التطبيقات) */
-        .apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; max-width: 800px; margin: 0 auto; }
-        .app-card { 
-            background: var(--surface-bg); border: 2px solid transparent; border-radius: 20px; 
-            padding: 35px 25px; text-align: center; cursor: pointer; transition: all 0.3s ease; 
-            display: flex; flex-direction: column; align-items: center; gap: 15px; text-decoration: none; color: var(--text-main);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.03); position: relative; overflow: hidden;
+        .logo-container { 
+            background: rgba(0, 255, 127, 0.05); padding: 15px 40px; border-radius: 50px; 
+            border: 1px solid var(--border); margin-bottom: 20px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px rgba(0,255,127,0.1);
         }
-        .app-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(10,104,71,0.03) 0%, transparent 100%); opacity: 0; transition: 0.3s;}
+        .logo-container img { height: 60px; width: auto; object-fit: contain; display: block; }
+        /* اللوجو النصي المؤقت (لحد ما ترفع الصورة) */
+        .logo-fallback { display: flex; align-items: center; gap: 10px; font-size: 1.8rem; font-weight: 900; color: var(--primary); text-shadow: 0 0 10px rgba(0,255,127,0.3); }
         
-        .app-card:hover { transform: translateY(-8px); border-color: var(--primary-color); box-shadow: 0 15px 35px rgba(10,104,71,0.15); }
-        .app-card:hover::before { opacity: 1; }
+        .desktop-header h1 { color: var(--text); font-size: 2rem; font-weight: 900; margin-bottom: 5px; }
+        .desktop-header p { color: var(--text-muted); font-size: 1rem; font-weight: 600; }
         
-        .app-icon-box { width: 80px; height: 80px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin-bottom: 10px; transition: 0.3s;}
-        .app-card:hover .app-icon-box { transform: scale(1.1) rotate(5deg); }
-        
-        /* ألوان مخصصة لكل أيقونة */
-        .icon-reception { background: #e0f2fe; color: #0284c7; }
-        .icon-lab { background: #dcfce7; color: #16a34a; }
-        .icon-manage { background: #f3e8ff; color: #9333ea; }
-        .icon-dashboard { background: #fef3c7; color: #d97706; }
+        .logout-btn { 
+            position: absolute; top: 0; left: 0; background: rgba(239, 68, 68, 0.1); color: #ef4444; 
+            border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 20px; border-radius: 12px; 
+            cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.9rem;
+        }
+        .logout-btn:hover { background: #ef4444; color: white; box-shadow: 0 0 15px rgba(239,68,68,0.4);}
 
-        .app-name { font-size: 1.3rem; font-weight: 800; color: var(--text-main); z-index: 1;}
-        .app-desc { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; z-index: 1;}
+        /* الكروت (التطبيقات) - تصميم زجاجي وشيك وصغير */
+        .apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 700px; margin: 0 auto; }
+        
+        .app-card { 
+            background: var(--surface); border: 1px solid var(--border); border-radius: 20px; 
+            padding: 25px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; 
+            display: flex; flex-direction: column; align-items: center; gap: 12px; text-decoration: none; color: var(--text);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); position: relative; overflow: hidden;
+        }
+        
+        /* تأثير الإضاءة الخضراء لما تقف بالماوس */
+        .app-card:hover { 
+            transform: translateY(-5px); border-color: var(--primary); 
+            box-shadow: 0 15px 30px rgba(0,255,127,0.15), 0 0 20px rgba(0,255,127,0.1); 
+        }
+        
+        .app-icon-box { 
+            width: 65px; height: 65px; border-radius: 18px; display: flex; align-items: center; justify-content: center; 
+            font-size: 2rem; background: rgba(0, 255, 127, 0.05); color: var(--primary); border: 1px solid var(--border);
+            transition: 0.3s;
+        }
+        .app-card:hover .app-icon-box { background: var(--primary); color: var(--bg); box-shadow: 0 0 20px rgba(0,255,127,0.4); }
+
+        .app-name { font-size: 1.2rem; font-weight: 900; color: var(--text); }
+        .app-desc { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; line-height: 1.4;}
 
         /* المودال (باسورد الدكتور) */
-        #secretModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .secret-box { background: var(--surface-bg); padding: 35px; border-radius: 20px; text-align: center; width: 90%; max-width: 380px; border-top: 6px solid var(--danger-color); box-shadow: 0 20px 50px rgba(0,0,0,0.2);}
-        .secret-box h2 { color: var(--danger-color); margin-bottom: 10px; font-size: 1.6rem; }
-        .secret-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.9rem; }
-        .secret-box input { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid var(--border-color); background: #f8fafc; color: var(--text-main); text-align: center; font-size: 1.2rem; margin-bottom: 20px; outline: none; letter-spacing: 5px;}
-        .secret-box input:focus { border-color: var(--danger-color); }
+        #secretModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        .secret-box { background: var(--surface); padding: 40px; border-radius: 24px; text-align: center; width: 90%; max-width: 400px; border: 2px solid #ef4444; box-shadow: 0 0 40px rgba(239,68,68,0.2);}
+        .secret-box h2 { color: #ef4444; margin-bottom: 10px; font-size: 1.8rem; }
+        .secret-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; font-weight: 600;}
+        .secret-box input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border); background: var(--bg-darker); color: #ef4444; text-align: center; font-size: 1.5rem; margin-bottom: 25px; outline: none; letter-spacing: 8px; font-weight: bold;}
+        .secret-box input:focus { border-color: #ef4444; box-shadow: 0 0 15px rgba(239,68,68,0.2);}
         .modal-actions { display: flex; gap: 10px; }
-        .secret-box button { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.2s;}
-        .btn-confirm { background: var(--danger-color); color: white; }
-        .btn-confirm:hover { background: #dc2626; }
-        .btn-cancel { background: #f1f5f9; color: var(--text-main); }
-        .btn-cancel:hover { background: #e2e8f0; }
+        .secret-box button { padding: 14px 20px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.2s;}
+        .btn-confirm { background: #ef4444; color: white; box-shadow: 0 0 15px rgba(239,68,68,0.3);}
+        .btn-confirm:hover { background: #dc2626; box-shadow: 0 0 25px rgba(239,68,68,0.5);}
+        .btn-cancel { background: var(--bg-darker); color: var(--text-muted); border: 1px solid var(--border);}
+        .btn-cancel:hover { background: #1e293b; color: white; }
     </style>
 </head>
 <body>
@@ -90,21 +125,27 @@
     <!-- شاشة الدخول للموظف -->
     <div id="loginScreen">
         <h1 id="loginLabName">🔬 جاري التحميل...</h1>
-        <p>مرحباً بك في النظام الذكي، يرجى إدخال باسورد الموظف</p>
+        <p>أدخل باسورد الموظف للدخول إلى النظام الذكي</p>
         <div class="input-group">
             <input type="password" id="empPassword" placeholder="******" autocomplete="off">
         </div>
         <button class="btn-login" onclick="checkEmployeePassword()">دخول آمن للنظام</button>
-        <div class="error-msg" id="loginError">❌ الباسورد غير صحيح، حاول مرة أخرى</div>
+        <div class="error-msg" id="loginError">❌ الباسورد غير صحيح</div>
     </div>
 
-    <!-- شاشة الديسك توب (بعد الدخول) -->
+    <!-- شاشة الديسك توب -->
     <div id="desktopScreen">
         <div class="desktop-header">
             <button class="logout-btn" onclick="logout()">🚪 خروج</button>
+            
             <div class="logo-container">
-                <img src="logo.png" alt="Logo" onerror="this.parentElement.style.display='none'">
+                <!-- لو الصورة مش موجودة، هيظهر اللوجو النصي الشيك ده -->
+                <img src="logo.png" alt="TEBA LABS" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="logo-fallback" style="display:none;">
+                    <span>🔬</span> TEBA LABS
+                </div>
             </div>
+            
             <h1 id="desktopLabName"></h1>
             <p>النظام الرئيسي لإدارة المعامل</p>
         </div>
@@ -112,28 +153,28 @@
         <div class="apps-grid">
             <!-- الاستقبال -->
             <a href="reception.html" class="app-card">
-                <div class="app-icon-box icon-reception">🏥</div>
+                <div class="app-icon-box">🏥</div>
                 <div class="app-name">الاستقبال</div>
                 <div class="app-desc">تسجيل المرضى وإصدار الفواتير</div>
             </a>
             
             <!-- المعمل -->
             <a href="lab.html" class="app-card">
-                <div class="app-icon-box icon-lab">🔬</div>
+                <div class="app-icon-box">🔬</div>
                 <div class="app-name">المعمل</div>
                 <div class="app-desc">إدخال النتائج ونشرها للمرضى</div>
             </a>
 
             <!-- إدارة التحاليل -->
             <a href="tests_manage.html" class="app-card">
-                <div class="app-icon-box icon-manage">⚙️</div>
+                <div class="app-icon-box">⚙️</div>
                 <div class="app-name">إدارة التحاليل</div>
-                <div class="app-desc">التحكم في قائمة الأسعار والباراميترز</div>
+                <div class="app-desc">التحكم في الأسعار والباراميترز</div>
             </a>
 
             <!-- الداش بورد (للدكتور) -->
             <div class="app-card" onclick="openSecretModal()">
-                <div class="app-icon-box icon-dashboard">📊</div>
+                <div class="app-icon-box" style="color: #fbbf24; background: rgba(251,191,36,0.05); border-color: rgba(251,191,36,0.2);">📊</div>
                 <div class="app-name">لوحة التحكم</div>
                 <div class="app-desc">التقارير المالية والإحصائيات 🔒</div>
             </div>
@@ -154,7 +195,6 @@
     </div>
 
     <script>
-        // 1. قراءة بيانات المعمل من ملف الـ config
         document.addEventListener("DOMContentLoaded", function() {
             if (typeof TEBA_CONFIG !== 'undefined') {
                 document.title = "بوابة الدخول | " + TEBA_CONFIG.lab.name;
@@ -163,11 +203,9 @@
             }
         });
 
-        // 2. الباسوردات
         const EMP_PASS = TEBA_CONFIG.auth.employeePassword;
         const DOC_PASS = TEBA_CONFIG.auth.doctorPassword;
 
-        // 3. التحقق من باسورد الموظف
         function checkEmployeePassword() {
             const input = document.getElementById('empPassword').value;
             const error = document.getElementById('loginError');
@@ -183,7 +221,6 @@
             }
         }
 
-        // 4. التحكم في مودال الدكتور
         function openSecretModal() {
             document.getElementById('secretModal').style.display = 'flex';
             document.getElementById('docPassword').focus();
@@ -194,13 +231,11 @@
             document.getElementById('docPassword').value = '';
         }
 
-        // 5. التحقق من باسورد الدكتور
         function checkDoctorPassword() {
             const input = document.getElementById('docPassword').value;
             
             if (input === DOC_PASS) {
                 sessionStorage.setItem('doctor_access', 'granted');
-                // التوجيه الصح لفولدر الداش بورد
                 window.location.href = '../dashboard/admin.html';
             } else {
                 alert('❌ باسورد الدكتور غلط!');
@@ -208,7 +243,6 @@
             }
         }
 
-        // 6. تسجيل الخروج
         function logout() {
             sessionStorage.removeItem('emp_logged');
             sessionStorage.removeItem('doctor_access');
@@ -217,7 +251,6 @@
             document.getElementById('empPassword').value = '';
         }
 
-        // إتاحة الدخول بزرار Enter
         document.getElementById('empPassword').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') checkEmployeePassword();
         });
