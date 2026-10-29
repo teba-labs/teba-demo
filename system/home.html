@@ -7,131 +7,122 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <style>
+        /* ألوان فاتحة ومريحة (أبيض وأخضر فاتح) */
         :root {
-            /* ألوان مستوحاة من اللوجو الجديد - مريحة ومودرن */
-            --bg: #0f172a; /* رمادي مزرق غامق جداً */
-            --bg-gradient: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 70%);
-            --surface: rgba(30, 41, 59, 0.6); /* كروت شفافة */
-            --primary: #10b981; /* أخضر زمردي */
-            --primary-light: #34d399; /* أخضر فاتح */
-            --primary-dark: #047857;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --border: rgba(16, 185, 129, 0.2);
+            --bg: #f8fafc; 
+            --surface: #ffffff;
+            --primary: #0a6847;
+            --primary-light: #10b981;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
             --font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: var(--font); 
-            background: var(--bg);
-            background-image: var(--bg-gradient);
+            background-color: var(--bg); 
+            background-image: radial-gradient(circle at top right, #e0f2fe 0%, transparent 40%), radial-gradient(circle at bottom left, #dcfce7 0%, transparent 40%);
             color: var(--text); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; 
         }
 
-        /* شاشة الدخول (الباسورد) */
+        /* شاشة الدخول */
         #loginScreen { 
-            background: var(--surface); backdrop-filter: blur(15px); padding: 45px; border-radius: 24px; 
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px var(--border); 
-            text-align: center; width: 100%; max-width: 420px; 
+            background: var(--surface); padding: 40px; border-radius: 20px; 
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1); 
+            text-align: center; width: 100%; max-width: 400px; border-top: 6px solid var(--primary); 
         }
-        #loginScreen h1 { color: var(--primary-light); margin-bottom: 10px; font-size: 2.2rem; font-weight: 900; }
+        #loginScreen h1 { color: var(--primary); margin-bottom: 10px; font-size: 2rem; font-weight: 900;}
         #loginScreen p { color: var(--text-muted); margin-bottom: 30px; font-weight: 600;}
         
         .input-group { margin-bottom: 25px; }
         .input-group input { 
-            width: 100%; padding: 16px; border-radius: 14px; border: 2px solid var(--border); 
-            background: rgba(15, 23, 42, 0.8); color: var(--primary-light); font-size: 1.5rem; 
-            text-align: center; letter-spacing: 8px; outline: none; transition: 0.3s; font-weight: bold;
+            width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border); 
+            background: #f8fafc; color: var(--text); font-size: 1.2rem; text-align: center; letter-spacing: 5px; outline: none; transition: 0.3s; font-weight: bold;
         }
-        .input-group input:focus { border-color: var(--primary-light); box-shadow: 0 0 20px rgba(52, 211, 153, 0.2); }
+        .input-group input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(10,104,71,0.1); }
         
         .btn-login { 
-            width: 100%; padding: 16px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); 
-            color: white; border: none; border-radius: 14px; font-size: 1.1rem; font-weight: 900; 
-            cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+            width: 100%; padding: 15px; background: var(--primary); 
+            color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; 
+            cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px -5px rgba(10,104,71,0.4);
         }
-        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 15px 25px -5px rgba(16, 185, 129, 0.5); }
-        .error-msg { color: #f87171; margin-top: 15px; font-weight: bold; display: none; }
+        .btn-login:hover { background: #085a3d; transform: translateY(-2px); }
+        .error-msg { color: #ef4444; margin-top: 15px; font-weight: bold; display: none; }
 
         /* شاشة الديسك توب */
-        #desktopScreen { display: none; width: 100%; max-width: 950px; padding: 20px; animation: fadeIn 0.6s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        #desktopScreen { display: none; width: 100%; max-width: 900px; padding: 20px; position: relative; animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         
-        .desktop-header { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 40px; text-align: center; position: relative;}
-        
-        /* اللوجو - تم تكبيره وإبرازه */
-        .logo-container { 
-            background: rgba(255, 255, 255, 0.03); padding: 15px 50px; border-radius: 100px; 
-            border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 25px; display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 40px rgba(16, 185, 129, 0.15), inset 0 0 20px rgba(255, 255, 255, 0.05);
-            min-height: 160px; /* تكبير مساحة اللوجو */
-            transition: 0.3s;
-        }
-        .logo-container:hover { box-shadow: 0 0 60px rgba(16, 185, 129, 0.25); }
-        .logo-container img { height: 130px; width: auto; object-fit: contain; display: block; filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); }
-        
-        /* اللوجو النصي المؤقت */
-        .logo-fallback { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .logo-fallback .en { font-size: 2.5rem; font-weight: 900; color: var(--primary-light); letter-spacing: 2px; text-shadow: 0 0 20px rgba(52, 211, 153, 0.3);}
-        .logo-fallback .ar { font-size: 1.5rem; font-weight: 700; color: var(--text); }
-        
-        .desktop-header h1 { color: var(--text); font-size: 2.2rem; font-weight: 900; margin-bottom: 8px; }
-        .desktop-header p { color: var(--text-muted); font-size: 1.1rem; font-weight: 600; }
-        
+        /* زرار الخروج - فوق على الشمال ثابت */
         .logout-btn { 
-            position: absolute; top: 0; left: 0; background: rgba(239, 68, 68, 0.1); color: #f87171; 
-            border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 20px; border-radius: 12px; 
-            cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.9rem; backdrop-filter: blur(10px);
+            position: absolute; top: 0; left: 20px; background: #fee2e2; color: #ef4444; 
+            border: 1px solid #fecaca; padding: 10px 20px; border-radius: 10px; 
+            cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.9rem; z-index: 10;
         }
-        .logout-btn:hover { background: #ef4444; color: white; box-shadow: 0 0 15px rgba(239,68,68,0.4);}
+        .logout-btn:hover { background: #ef4444; color: white; }
 
-        /* الكروت (التطبيقات) */
-        .apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; max-width: 750px; margin: 0 auto; }
+        /* الهيدر واللوجو - تم تكبيره جداً */
+        .desktop-header { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 30px; text-align: center; padding-top: 20px;}
+        
+        .logo-container { 
+            background: transparent; padding: 0; margin-bottom: 15px; 
+            display: flex; align-items: center; justify-content: center;
+            min-height: 140px; /* مساحة ضخمة للوجو */
+        }
+        .logo-container img { height: 140px; width: auto; object-fit: contain; display: block; filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); }
+        
+        /* اللوجو النصي لو الصورة مش موجودة */
+        .logo-fallback { display: flex; flex-direction: column; align-items: center; }
+        .logo-fallback .en { font-size: 3rem; font-weight: 900; color: var(--primary); letter-spacing: 2px; line-height: 1; }
+        .logo-fallback .ar { font-size: 1.5rem; font-weight: 700; color: var(--text); margin-top: 5px;}
+        
+        .desktop-header h1 { color: var(--text); font-size: 1.8rem; font-weight: 900; margin-bottom: 5px; }
+        .desktop-header p { color: var(--text-muted); font-size: 1rem; font-weight: 600; }
+
+        /* الكروت (التطبيقات) - تم تصغيرها جداً */
+        .apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-width: 600px; margin: 0 auto; }
         
         .app-card { 
-            background: var(--surface); backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; 
-            padding: 30px 20px; text-align: center; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            display: flex; flex-direction: column; align-items: center; gap: 12px; text-decoration: none; color: var(--text);
-            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); position: relative; overflow: hidden;
+            background: var(--surface); border: 2px solid transparent; border-radius: 16px; 
+            padding: 20px 15px; text-align: center; cursor: pointer; transition: all 0.3s ease; 
+            display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--text);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); position: relative;
         }
         
-        /* تأثير لما تقف بالماوس */
         .app-card:hover { 
-            transform: translateY(-8px); background: rgba(30, 41, 59, 0.9);
-            border-color: var(--primary); box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.2); 
+            transform: translateY(-4px); border-color: var(--primary-light); 
+            box-shadow: 0 10px 25px -5px rgba(10, 104, 71, 0.15); 
         }
         
-        /* أيقونات التطبيقات */
+        /* أيقونات صغيرة وشيك */
         .app-icon-box { 
-            width: 75px; height: 75px; border-radius: 20px; display: flex; align-items: center; justify-content: center; 
-            font-size: 2.2rem; margin-bottom: 5px; transition: 0.3s;
-            background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);
+            width: 55px; height: 55px; border-radius: 12px; display: flex; align-items: center; justify-content: center; 
+            font-size: 1.6rem; margin-bottom: 2px; transition: 0.3s;
         }
-        /* تخصيص لون كل كارت عشان ميبقاش كله أخضر */
-        .app-card:nth-child(1) .app-icon-box { color: #38bdf8; background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.2); } /* أزرق للاستقبال */
-        .app-card:nth-child(2) .app-icon-box { color: #34d399; background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.2); } /* أخضر للمعمل */
-        .app-card:nth-child(3) .app-icon-box { color: #a78bfa; background: rgba(167, 139, 250, 0.1); border-color: rgba(167, 139, 250, 0.2); } /* بنفسجي للإدارة */
-        .app-card:nth-child(4) .app-icon-box { color: #fbbf24; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); } /* ذهبي للتحكم */
+        
+        /* ألوان الأيقونات */
+        .app-card:nth-child(1) .app-icon-box { color: #0284c7; background: #e0f2fe; } /* أزرق للاستقبال */
+        .app-card:nth-child(2) .app-icon-box { color: #16a34a; background: #dcfce7; } /* أخضر للمعمل */
+        .app-card:nth-child(3) .app-icon-box { color: #9333ea; background: #f3e8ff; } /* بنفسجي للإدارة */
+        .app-card:nth-child(4) .app-icon-box { color: #d97706; background: #fef3c7; } /* ذهبي للتحكم */
 
-        .app-card:hover .app-icon-box { transform: scale(1.1) rotate(5deg); background: white; color: var(--bg); }
+        .app-name { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+        .app-desc { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; line-height: 1.4;}
 
-        .app-name { font-size: 1.3rem; font-weight: 800; color: var(--text); }
-        .app-desc { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; line-height: 1.5;}
-
-        /* المودال */
-        #secretModal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-        .secret-box { background: var(--surface); backdrop-filter: blur(20px); padding: 40px; border-radius: 24px; text-align: center; width: 90%; max-width: 400px; border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);}
-        .secret-box h2 { color: #f87171; margin-bottom: 10px; font-size: 1.8rem; }
-        .secret-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95rem; font-weight: 600;}
-        .secret-box input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.2); background: rgba(15, 23, 42, 0.8); color: #f87171; text-align: center; font-size: 1.5rem; margin-bottom: 25px; outline: none; letter-spacing: 8px; font-weight: bold;}
-        .secret-box input:focus { border-color: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,0.2);}
+        /* المودال (باسورد الدكتور) */
+        #secretModal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .secret-box { background: var(--surface); padding: 35px; border-radius: 20px; text-align: center; width: 90%; max-width: 380px; border-top: 6px solid #ef4444; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.2);}
+        .secret-box h2 { color: #ef4444; margin-bottom: 10px; font-size: 1.6rem; }
+        .secret-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.9rem; font-weight: 600;}
+        .secret-box input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border); background: #f8fafc; color: #ef4444; text-align: center; font-size: 1.2rem; margin-bottom: 20px; outline: none; letter-spacing: 5px; font-weight: bold;}
+        .secret-box input:focus { border-color: #ef4444; background: white;}
         .modal-actions { display: flex; gap: 10px; }
-        .secret-box button { padding: 14px 20px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.2s;}
+        .secret-box button { padding: 12px 15px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; font-size: 0.95rem; transition: 0.2s;}
         .btn-confirm { background: #ef4444; color: white; }
         .btn-confirm:hover { background: #dc2626; }
-        .btn-cancel { background: rgba(255, 255, 255, 0.1); color: var(--text); }
-        .btn-cancel:hover { background: rgba(255, 255, 255, 0.2); }
+        .btn-cancel { background: #e2e8f0; color: var(--text); }
+        .btn-cancel:hover { background: #cbd5e1; }
     </style>
 </head>
 <body>
@@ -139,21 +130,21 @@
     <!-- شاشة الدخول للموظف -->
     <div id="loginScreen">
         <h1 id="loginLabName">🔬 جاري التحميل...</h1>
-        <p>مرحباً بك، يرجى إدخال باسورد الموظف</p>
+        <p>أدخل باسورد الموظف للدخول إلى النظام</p>
         <div class="input-group">
             <input type="password" id="empPassword" placeholder="******" autocomplete="off">
         </div>
-        <button class="btn-login" onclick="checkEmployeePassword()">دخول آمن للنظام</button>
+        <button class="btn-login" onclick="checkEmployeePassword()">دخول آمن</button>
         <div class="error-msg" id="loginError">❌ الباسورد غير صحيح</div>
     </div>
 
-    <!-- شاشة الديسك توب (بعد الدخول) -->
+    <!-- شاشة الديسك توب -->
     <div id="desktopScreen">
+        <button class="logout-btn" onclick="logout()">🚪 خروج</button>
+        
         <div class="desktop-header">
-            <button class="logout-btn" onclick="logout()">🚪 خروج</button>
-            
             <div class="logo-container">
-                <!-- لو الصورة مش موجودة، النص الشيك ده هيظهر -->
+                <!-- اللوجو الضخم -->
                 <img src="logo.png" alt="TEBA LABS" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 <div class="logo-fallback" style="display:none;">
                     <span class="en">TEBA LABS</span>
@@ -161,37 +152,34 @@
                 </div>
             </div>
             
-            <h1 id="desktopLabName"></h1>
+            <h1 id="desktopLabName">مرحباً، معامل طيبة</h1>
             <p>النظام الرئيسي لإدارة المعامل</p>
         </div>
         
+        <!-- الكروت الصغيرة -->
         <div class="apps-grid">
-            <!-- الاستقبال -->
             <a href="reception.html" class="app-card">
                 <div class="app-icon-box">🏥</div>
                 <div class="app-name">الاستقبال</div>
                 <div class="app-desc">تسجيل المرضى وإصدار الفواتير</div>
             </a>
             
-            <!-- المعمل -->
             <a href="lab.html" class="app-card">
                 <div class="app-icon-box">🔬</div>
                 <div class="app-name">المعمل</div>
-                <div class="app-desc">إدخال النتائج ونشرها للمرضى</div>
+                <div class="app-desc">إدخال النتائج ونشرها</div>
             </a>
 
-            <!-- إدارة التحاليل -->
             <a href="tests_manage.html" class="app-card">
                 <div class="app-icon-box">⚙️</div>
                 <div class="app-name">إدارة التحاليل</div>
-                <div class="app-desc">التحكم في الأسعار والباراميترز</div>
+                <div class="app-desc">الأسعار والباراميترز</div>
             </a>
 
-            <!-- الداش بورد (للدكتور) -->
             <div class="app-card" onclick="openSecretModal()">
                 <div class="app-icon-box">📊</div>
                 <div class="app-name">لوحة التحكم</div>
-                <div class="app-desc">التقارير المالية والإحصائيات 🔒</div>
+                <div class="app-desc">التقارير والإحصائيات 🔒</div>
             </div>
         </div>
     </div>
@@ -200,10 +188,10 @@
     <div id="secretModal">
         <div class="secret-box">
             <h2>🔒 منطقة محظورة</h2>
-            <p>هذه الشاشة مخصصة للدكتور فقط لمراجعة التقارير</p>
+            <p>مخصصة للدكتور فقط</p>
             <input type="password" id="docPassword" placeholder="******">
             <div class="modal-actions">
-                <button class="btn-confirm" onclick="checkDoctorPassword()">تأكيد الدخول</button>
+                <button class="btn-confirm" onclick="checkDoctorPassword()">دخول</button>
                 <button class="btn-cancel" onclick="closeSecretModal()">إلغاء</button>
             </div>
         </div>
