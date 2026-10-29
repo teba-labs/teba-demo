@@ -171,7 +171,7 @@
             if (input === DOC_PASS) {
                 // حفظ تصريح الدخول للداش بورد
                 sessionStorage.setItem('doctor_access', 'granted');
-                window.location.href = 'admin.html';
+window.location.href = '../dashboard/admin.html';
             } else {
                 alert('❌ باسورد الدكتور غلط!');
                 document.getElementById('docPassword').value = '';
