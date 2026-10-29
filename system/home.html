@@ -5,60 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بوابة الدخول | النظام</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- ربط ملف الإعدادات -->
     <script src="config.js"></script>
     <style>
         :root {
-            --primary-bg: #0f172a; --surface-bg: #1e293b; --primary-color: #10b981;
-            --accent-color: #3b82f6; --warning-color: #f59e0b; --danger-color: #ef4444;
-            --text-main: #f8fafc; --text-muted: #94a3b8; --border-color: #334155; 
+            --primary-bg: #f0fdf4; --surface-bg: #ffffff; --primary-color: #0a6847;
+            --accent-color: #3498db; --warning-color: #f39c12; --danger-color: #ef4444;
+            --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0; 
             --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font-family); background-color: var(--primary-bg); color: var(--text-main); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        body { font-family: var(--font-family); background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); color: var(--text-main); height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 
-        /* شاشة الدخول */
-        #loginScreen { background: var(--surface-bg); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; width: 100%; max-width: 400px; border: 1px solid var(--border-color); }
-        #loginScreen h1 { color: var(--primary-color); margin-bottom: 10px; font-size: 2rem; }
-        #loginScreen p { color: var(--text-muted); margin-bottom: 25px; }
-        .input-group { margin-bottom: 20px; }
-        .input-group input { width: 100%; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--primary-bg); color: white; font-size: 1.2rem; text-align: center; letter-spacing: 5px; outline: none; }
-        .input-group input:focus { border-color: var(--primary-color); }
-        .btn-login { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-login:hover { background: #059669; }
+        /* شاشة الدخول (الباسورد) */
+        #loginScreen { background: var(--surface-bg); padding: 40px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); text-align: center; width: 100%; max-width: 420px; border: 1px solid var(--border-color); position: relative; overflow: hidden; }
+        #loginScreen::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, var(--primary-color), var(--accent-color)); }
+        #loginScreen h1 { color: var(--primary-color); margin-bottom: 10px; font-size: 2rem; font-weight: 800;}
+        #loginScreen p { color: var(--text-muted); margin-bottom: 30px; font-weight: 600;}
+        .input-group { margin-bottom: 25px; }
+        .input-group input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--border-color); background: #f8fafc; color: var(--text-main); font-size: 1.2rem; text-align: center; letter-spacing: 5px; outline: none; transition: 0.3s;}
+        .input-group input:focus { border-color: var(--primary-color); background: white; box-shadow: 0 0 0 4px rgba(10,104,71,0.1); }
+        .btn-login { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(10,104,71,0.3);}
+        .btn-login:hover { background: #085a3d; transform: translateY(-2px); }
         .error-msg { color: var(--danger-color); margin-top: 15px; font-weight: bold; display: none; }
 
         /* شاشة الديسك توب */
-        #desktopScreen { display: none; width: 100%; max-width: 1200px; padding: 20px; animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        #desktopScreen { display: none; width: 100%; max-width: 1000px; padding: 30px; animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         
-        .desktop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
-        .desktop-header h1 { color: var(--text-main); font-size: 1.8rem; display: flex; align-items: center; gap: 15px;}
-        .desktop-header h1 img { height: 50px; background: #fff; padding: 5px 10px; border-radius: 8px; }
-        .logout-btn { background: transparent; color: var(--danger-color); border: 1px solid var(--danger-color); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .desktop-header { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 50px; text-align: center; position: relative;}
+        
+        /* اللوجو */
+        .logo-container { background: white; padding: 15px 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid var(--border-color); transition: 0.3s;}
+        .logo-container:hover { transform: scale(1.02); }
+        .logo-container img { height: 80px; width: auto; object-fit: contain; display: block; }
+        
+        .desktop-header h1 { color: var(--primary-color); font-size: 2rem; font-weight: 900; margin-bottom: 5px; }
+        .desktop-header p { color: var(--text-muted); font-size: 1.1rem; font-weight: 600; }
+        
+        .logout-btn { position: absolute; top: 0; left: 0; background: #fee2e2; color: var(--danger-color); border: 1px solid #fecaca; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.95rem;}
         .logout-btn:hover { background: var(--danger-color); color: white; }
 
-        .apps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 25px; }
-        .app-icon { 
-            background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 16px; 
-            padding: 30px 20px; text-align: center; cursor: pointer; transition: 0.3s; 
+        /* الكروت (التطبيقات) */
+        .apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; max-width: 800px; margin: 0 auto; }
+        .app-card { 
+            background: var(--surface-bg); border: 2px solid transparent; border-radius: 20px; 
+            padding: 35px 25px; text-align: center; cursor: pointer; transition: all 0.3s ease; 
             display: flex; flex-direction: column; align-items: center; gap: 15px; text-decoration: none; color: var(--text-main);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.03); position: relative; overflow: hidden;
         }
-        .app-icon:hover { transform: translateY(-5px); border-color: var(--primary-color); box-shadow: 0 10px 20px rgba(16, 185, 129, 0.1); }
-        .app-icon .icon { font-size: 3rem; }
-        .app-icon .name { font-size: 1.2rem; font-weight: bold; }
+        .app-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(10,104,71,0.03) 0%, transparent 100%); opacity: 0; transition: 0.3s;}
         
-        .app-icon.locked .icon { opacity: 0.5; }
-        .app-icon.locked::after { content: '🔒'; font-size: 1.5rem; position: absolute; margin-top: -10px; margin-right: -10px; }
+        .app-card:hover { transform: translateY(-8px); border-color: var(--primary-color); box-shadow: 0 15px 35px rgba(10,104,71,0.15); }
+        .app-card:hover::before { opacity: 1; }
+        
+        .app-icon-box { width: 80px; height: 80px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin-bottom: 10px; transition: 0.3s;}
+        .app-card:hover .app-icon-box { transform: scale(1.1) rotate(5deg); }
+        
+        /* ألوان مخصصة لكل أيقونة */
+        .icon-reception { background: #e0f2fe; color: #0284c7; }
+        .icon-lab { background: #dcfce7; color: #16a34a; }
+        .icon-manage { background: #f3e8ff; color: #9333ea; }
+        .icon-dashboard { background: #fef3c7; color: #d97706; }
 
-        /* شاشة الباسورد السرية للداش بورد */
-        #secretModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .secret-box { background: var(--surface-bg); padding: 30px; border-radius: 16px; text-align: center; width: 90%; max-width: 350px; border: 1px solid var(--danger-color); }
-        .secret-box h2 { color: var(--danger-color); margin-bottom: 20px; }
-        .secret-box input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--primary-bg); color: white; text-align: center; font-size: 1.1rem; margin-bottom: 15px; outline: none; }
-        .secret-box button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 48%; }
+        .app-name { font-size: 1.3rem; font-weight: 800; color: var(--text-main); z-index: 1;}
+        .app-desc { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; z-index: 1;}
+
+        /* المودال (باسورد الدكتور) */
+        #secretModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .secret-box { background: var(--surface-bg); padding: 35px; border-radius: 20px; text-align: center; width: 90%; max-width: 380px; border-top: 6px solid var(--danger-color); box-shadow: 0 20px 50px rgba(0,0,0,0.2);}
+        .secret-box h2 { color: var(--danger-color); margin-bottom: 10px; font-size: 1.6rem; }
+        .secret-box p { color: var(--text-muted); margin-bottom: 25px; font-size: 0.9rem; }
+        .secret-box input { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid var(--border-color); background: #f8fafc; color: var(--text-main); text-align: center; font-size: 1.2rem; margin-bottom: 20px; outline: none; letter-spacing: 5px;}
+        .secret-box input:focus { border-color: var(--danger-color); }
+        .modal-actions { display: flex; gap: 10px; }
+        .secret-box button { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.2s;}
         .btn-confirm { background: var(--danger-color); color: white; }
-        .btn-cancel { background: var(--border-color); color: var(--text-main); }
+        .btn-confirm:hover { background: #dc2626; }
+        .btn-cancel { background: #f1f5f9; color: var(--text-main); }
+        .btn-cancel:hover { background: #e2e8f0; }
     </style>
 </head>
 <body>
@@ -66,44 +90,52 @@
     <!-- شاشة الدخول للموظف -->
     <div id="loginScreen">
         <h1 id="loginLabName">🔬 جاري التحميل...</h1>
-        <p>أدخل باسورد الموظف للدخول إلى النظام</p>
+        <p>مرحباً بك في النظام الذكي، يرجى إدخال باسورد الموظف</p>
         <div class="input-group">
             <input type="password" id="empPassword" placeholder="******" autocomplete="off">
         </div>
-        <button class="btn-login" onclick="checkEmployeePassword()">دخول للنظام</button>
-        <div class="error-msg" id="loginError">❌ الباسورد غلط</div>
+        <button class="btn-login" onclick="checkEmployeePassword()">دخول آمن للنظام</button>
+        <div class="error-msg" id="loginError">❌ الباسورد غير صحيح، حاول مرة أخرى</div>
     </div>
 
-    <!-- شاشة الديسك توب -->
+    <!-- شاشة الديسك توب (بعد الدخول) -->
     <div id="desktopScreen">
         <div class="desktop-header">
-            <h1>🖥️ النظام الرئيسي - <span id="desktopLabName"></span></h1>
-            <button class="logout-btn" onclick="logout()">خروج</button>
+            <button class="logout-btn" onclick="logout()">🚪 خروج</button>
+            <div class="logo-container">
+                <img src="logo.png" alt="Logo" onerror="this.parentElement.style.display='none'">
+            </div>
+            <h1 id="desktopLabName"></h1>
+            <p>النظام الرئيسي لإدارة المعامل</p>
         </div>
         
         <div class="apps-grid">
             <!-- الاستقبال -->
-            <a href="reception.html" class="app-icon">
-                <div class="icon">🏥</div>
-                <div class="name">الاستقبال</div>
+            <a href="reception.html" class="app-card">
+                <div class="app-icon-box icon-reception">🏥</div>
+                <div class="app-name">الاستقبال</div>
+                <div class="app-desc">تسجيل المرضى وإصدار الفواتير</div>
             </a>
             
             <!-- المعمل -->
-            <a href="lab.html" class="app-icon">
-                <div class="icon">🔬</div>
-                <div class="name">المعمل</div>
+            <a href="lab.html" class="app-card">
+                <div class="app-icon-box icon-lab">🔬</div>
+                <div class="app-name">المعمل</div>
+                <div class="app-desc">إدخال النتائج ونشرها للمرضى</div>
             </a>
 
             <!-- إدارة التحاليل -->
-            <a href="tests_manage.html" class="app-icon">
-                <div class="icon">⚙️</div>
-                <div class="name">إدارة التحاليل</div>
+            <a href="tests_manage.html" class="app-card">
+                <div class="app-icon-box icon-manage">⚙️</div>
+                <div class="app-name">إدارة التحاليل</div>
+                <div class="app-desc">التحكم في قائمة الأسعار والباراميترز</div>
             </a>
 
-            <!-- الداش بورد -->
-            <div class="app-icon locked" onclick="openSecretModal()">
-                <div class="icon">📊</div>
-                <div class="name">لوحة التحكم</div>
+            <!-- الداش بورد (للدكتور) -->
+            <div class="app-card" onclick="openSecretModal()">
+                <div class="app-icon-box icon-dashboard">📊</div>
+                <div class="app-name">لوحة التحكم</div>
+                <div class="app-desc">التقارير المالية والإحصائيات 🔒</div>
             </div>
         </div>
     </div>
@@ -112,26 +144,26 @@
     <div id="secretModal">
         <div class="secret-box">
             <h2>🔒 منطقة محظورة</h2>
-            <p style="color:var(--text-muted); margin-bottom:15px; font-size:0.9rem;">هذه الشاشة مخصصة للدكتور فقط.</p>
-            <input type="password" id="docPassword" placeholder="باسورد الدكتور">
-            <div style="display:flex; justify-content:space-between;">
-                <button class="btn-confirm" onclick="checkDoctorPassword()">دخول</button>
+            <p>هذه الشاشة مخصصة للدكتور فقط لمراجعة التقارير</p>
+            <input type="password" id="docPassword" placeholder="******">
+            <div class="modal-actions">
+                <button class="btn-confirm" onclick="checkDoctorPassword()">تأكيد الدخول</button>
                 <button class="btn-cancel" onclick="closeSecretModal()">إلغاء</button>
             </div>
         </div>
     </div>
 
     <script>
-        // 1. قراءة بيانات المعمل من ملف الـ config وعرضها
+        // 1. قراءة بيانات المعمل من ملف الـ config
         document.addEventListener("DOMContentLoaded", function() {
             if (typeof TEBA_CONFIG !== 'undefined') {
                 document.title = "بوابة الدخول | " + TEBA_CONFIG.lab.name;
-                document.getElementById('loginLabName').innerText = "🔬 " + TEBA_CONFIG.lab.name;
-                document.getElementById('desktopLabName').innerText = TEBA_CONFIG.lab.name;
+                document.getElementById('loginLabName').innerText = TEBA_CONFIG.lab.name;
+                document.getElementById('desktopLabName').innerText = "مرحباً، " + TEBA_CONFIG.lab.name;
             }
         });
 
-        // 2. الباسوردات من config
+        // 2. الباسوردات
         const EMP_PASS = TEBA_CONFIG.auth.employeePassword;
         const DOC_PASS = TEBA_CONFIG.auth.doctorPassword;
 
@@ -141,9 +173,7 @@
             const error = document.getElementById('loginError');
             
             if (input === EMP_PASS) {
-                // حفظ جلسة الموظف
                 sessionStorage.setItem('emp_logged', 'yes');
-                
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('desktopScreen').style.display = 'block';
                 error.style.display = 'none';
@@ -153,7 +183,7 @@
             }
         }
 
-        // 4. فتح شاشة باسورد الدكتور
+        // 4. التحكم في مودال الدكتور
         function openSecretModal() {
             document.getElementById('secretModal').style.display = 'flex';
             document.getElementById('docPassword').focus();
@@ -169,9 +199,9 @@
             const input = document.getElementById('docPassword').value;
             
             if (input === DOC_PASS) {
-                // حفظ تصريح الدخول للداش بورد
                 sessionStorage.setItem('doctor_access', 'granted');
-window.location.href = '../dashboard/admin.html';
+                // التوجيه الصح لفولدر الداش بورد
+                window.location.href = '../dashboard/admin.html';
             } else {
                 alert('❌ باسورد الدكتور غلط!');
                 document.getElementById('docPassword').value = '';
