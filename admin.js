@@ -1,9 +1,13 @@
 ﻿/* =====================================================
-   TEBA LABS - Admin Logic (v62 - AI + Any AI Fallback)
+   TEBA LABS - Admin Logic (v65 - Full Merge)
    ===================================================== */
 
 (function(){
   'use strict';
+
+  const supabaseUrl = TEBA_CONFIG.supabase.url;
+  const supabaseKey = TEBA_CONFIG.supabase.key;
+  const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
   /* ============= SECURITY CONSTANTS ============= */
   const SESSION_KEY = 'teba_admin_session';
@@ -17,7 +21,7 @@
   const LOCK_DURATION = 15 * 60 * 1000;
   const DEFAULT_PASSWORD = 'teba2026admin';
   const MAX_FILE_SIZE = 20 * 1024 * 1024;
-  const BACKUP_VERSION = 'v62';
+  const BACKUP_VERSION = 'v65';
 
   let salesWorkbook = null;
   let pricesWorkbook = null;
@@ -272,6 +276,9 @@
     document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
     const target = document.getElementById('report-' + reportName); if(target) target.classList.add('active');
     document.querySelectorAll('.admin-nav button').forEach(b => b.classList.toggle('active', b.dataset.report === reportName));
+    
+    if(reportName === 'reconciliation') renderReconciliation();
+    if(reportName === 'live') renderLiveStats();
     if(reportName === 'overview') renderOverview();
     if(reportName === 'annual') renderAnnualReport();
     if(reportName === 'financial') renderFinancialReport();
@@ -295,7 +302,7 @@
   async function showDashboard(){
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminDashboard').style.display = 'flex';
-    await loadSavedDataFromDB(); updateLastUpdatedUI(); window.showReport('overview');
+    await loadSavedDataFromDB(); updateLastUpdatedUI(); window.showReport('reconciliation');
     if ('requestIdleCallback' in window) requestIdleCallback(() => updateStorageIndicator(), { timeout: 2000 }); else setTimeout(updateStorageIndicator, 1500);
   }
 
@@ -391,7 +398,6 @@
   function getTestMovementData(branch) {
     const cacheKey = branch === 'الجعافرة' ? 'jaafara' : 'bahtim';
     if (_testMovementCache[cacheKey]) return _testMovementCache[cacheKey];
-    
     const sheetKey = branch === 'الجعافرة' ? 'تكرار التحاليل فرع الجعافرة' : 'تكرار التحاليل فرع بهتيم';
     const data = getSheetData(sheetKey); 
     const testData = [];
@@ -477,81 +483,229 @@
     else {
       const resJ = calcBranch('الجعافرة', dJ.exp);
       const resB = calcBranch('بهتيم', dB.exp);
-      
       const combinedList = [];
       const map = new Map();
-      
       [...resJ.list, ...resB.list].forEach(t => {
         const key = t.name.toLowerCase();
-        if (!map.has(key)) {
-          map.set(key, { ...t, count: 0, trueTotalProfit: 0 });
-        }
+        if (!map.has(key)) map.set(key, { ...t, count: 0, trueTotalProfit: 0 });
         const existing = map.get(key);
         existing.count += t.count;
         existing.trueTotalProfit += t.trueTotalProfit;
       });
-      
       map.forEach(t => {
         t.trueProfitUnit = t.count > 0 ? t.trueTotalProfit / t.count : 0;
         t.trueCost = t.sell - t.trueProfitUnit;
         combinedList.push(t);
       });
-      
       _mergedCache.combined = combinedList;
       return combinedList;
     }
   }
 
+  /* ==============================================================
+     الدوال الجديدة الخاصة بالمطابقة واللايف (المرحلة 6 و 7)
+     ============================================================== */
+  window.renderReconciliation = async function() {
+    if (!salesWorkbook) {
+      document.getElementById('recon-approval-area').innerHTML = '<p style="color:red; font-weight:bold; font-size:1.2rem;">⚠️ ارفع ملف المتابعة السنوية أولاً (من تاب رفع الملفات).</p>';
+      return;
+    }
+    const year = document.getElementById('reconYearSelector').value;
+    const month = document.getElementById('reconMonthSelector').value;
+    const branchFilter = document.getElementById('reconBranchSelector').value;
+    document.getElementById('recon-year-title').innerText = year;
+
+    showLoading('جاري حساب المطابقة...');
+
+    try {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+      
+      let query = _supabase.from('visits').select('*')
+        .gte('visit_date', startDate.toISOString())
+        .lte('visit_date', endDate.toISOString());
+      
+      if (branchFilter === 'jaafara') query = query.eq('branch_id', 1);
+      if (branchFilter === 'bahtim') query = query.eq('branch_id', 2);
+
+      const { data: visits, error } = await query;
+      if (error) throw error;
+
+      const liveCases = visits ? visits.length : 0;
+      const liveRevenue = visits ? visits.reduce((sum, v) => sum + parseFloat(v.paid_amount || 0), 0) : 0;
+
+      let excelCases = 0, excelRevenue = 0;
+      if (branchFilter === 'combined') {
+        const dJ = extractMonthData(year, month, 'الجعافرة');
+        const dB = extractMonthData(year, month, 'بهتيم');
+        excelCases = dJ.cases + dB.cases;
+        excelRevenue = dJ.rev + dB.rev;
+      } else if (branchFilter === 'jaafara') {
+        const dJ = extractMonthData(year, month, 'الجعافرة');
+        excelCases = dJ.cases;
+        excelRevenue = dJ.rev;
+      } else {
+        const dB = extractMonthData(year, month, 'بهتيم');
+        excelCases = dB.cases;
+        excelRevenue = dB.rev;
+      }
+
+      const diffCases = liveCases - excelCases;
+      const diffRevenue = liveRevenue - excelRevenue;
+
+      document.getElementById('recon-live-revenue').innerText = liveRevenue.toLocaleString() + ' ج';
+      document.getElementById('recon-live-cases').innerText = liveCases + ' حالة';
+      
+      document.getElementById('recon-excel-revenue').innerText = excelRevenue.toLocaleString() + ' ج';
+      document.getElementById('recon-excel-cases').innerText = excelCases + ' حالة';
+      
+      const diffRevEl = document.getElementById('recon-diff-revenue');
+      const diffCasesEl = document.getElementById('recon-diff-cases');
+      
+      diffRevEl.innerText = (diffRevenue > 0 ? '+' : '') + diffRevenue.toLocaleString() + ' ج';
+      diffCasesEl.innerText = (diffCases > 0 ? '+' : '') + diffCases + ' حالة';
+      
+      let diffColor = '#16a34a';
+      if (diffRevenue !== 0 || diffCases !== 0) diffColor = '#f59e0b';
+      if (Math.abs(diffRevenue) > 1000 || Math.abs(diffCases) > 10) diffColor = '#dc2626';
+      
+      diffRevEl.style.color = diffColor;
+      diffCasesEl.style.color = diffColor;
+
+      const { data: approval } = await _supabase.from('monthly_approvals').select('*').eq('year', year).eq('month', month).single();
+      
+      const approvalArea = document.getElementById('recon-approval-area');
+      if (approval) {
+        approvalArea.innerHTML = `<div style="background: rgba(22, 163, 74, 0.1); border: 2px solid #16a34a; color: #16a34a; padding: 15px; border-radius: 12px; font-size: 1.1rem; font-weight: bold;">
+          ✅ معتمد من: ${approval.approved_by} <br>
+          <span style="font-size: 0.9rem; font-weight: normal;">بتاريخ: ${new Date(approval.approved_at).toLocaleString('ar-EG')}</span>
+        </div>`;
+      } else {
+        approvalArea.innerHTML = `<button class="btn-export" style="background: linear-gradient(135deg, #16a34a, #15803d); font-size: 1.2rem; padding: 15px 40px;" onclick="approveMonth(${year}, ${month})">✅ اعتماد الشهر</button>`;
+      }
+
+      renderYearGrid(year);
+
+    } catch(err) {
+      console.error(err);
+      alert('حدث خطأ أثناء المطابقة: ' + err.message);
+    } finally {
+      hideLoading();
+    }
+  };
+
+  window.approveMonth = async function(year, month) {
+    const pwd = prompt('لإعتماد الشهر، أدخل باسورد الطبيب (999):');
+    if (pwd !== TEBA_CONFIG.auth.doctorPassword) {
+      if(pwd !== null) alert('❌ باسورد خطأ!');
+      return;
+    }
+
+    showLoading('جاري حفظ الاعتماد...');
+    try {
+      const { error } = await _supabase.from('monthly_approvals').upsert({
+        year: parseInt(year),
+        month: parseInt(month),
+        approved_by: TEBA_CONFIG.lab.doctor,
+        status: 'approved'
+      }, { onConflict: 'year,month' });
+
+      if (error) throw error;
+      alert('✅ تم اعتماد الشهر بنجاح!');
+      renderReconciliation();
+    } catch(err) {
+      alert('❌ خطأ أثناء الاعتماد: ' + err.message);
+    } finally {
+      hideLoading();
+    }
+  };
+
+  async function renderYearGrid(year) {
+    const grid = document.getElementById('recon-year-grid');
+    grid.innerHTML = 'جاري التحميل...';
+    const { data: approvals } = await _supabase.from('monthly_approvals').select('month').eq('year', year);
+    const approvedMonths = (approvals || []).map(a => a.month);
+    const monthsAr = ['يناير','فبراير','مارس','ابريل','مايو','يونيو','يوليو','اغسطس','سبتمبر','اكتوبر','نوفمبر','ديسمبر'];
+    grid.innerHTML = monthsAr.map((name, idx) => {
+      const m = idx + 1;
+      let boxClass = 'gray';
+      if (approvedMonths.includes(m)) {
+        boxClass = 'green';
+      } else {
+        const dJ = extractMonthData(year, m, 'الجعافرة');
+        const dB = extractMonthData(year, m, 'بهتيم');
+        if (dJ.cases > 0 || dB.cases > 0 || dJ.rev > 0 || dB.rev > 0) boxClass = 'yellow';
+      }
+      return `<div class="year-box ${boxClass}" onclick="document.getElementById('reconMonthSelector').value=${m}; renderReconciliation();">
+        ${name}<br><span style="font-size:0.7rem;">${boxClass === 'green' ? 'معتمد ✅' : boxClass === 'yellow' ? 'محتاج مراجعة ⚠️' : 'لا يوجد بيانات ⚪'}</span>
+      </div>`;
+    }).join('');
+  }
+
+  window.renderLiveStats = async function() {
+    const elCases = document.getElementById('live-cases');
+    const elTests = document.getElementById('live-tests');
+    const elPending = document.getElementById('live-pending');
+    const elPublished = document.getElementById('live-published');
+    if(elCases) elCases.innerText = '...'; if(elTests) elTests.innerText = '...'; if(elPending) elPending.innerText = '...'; if(elPublished) elPublished.innerText = '...';
+    try {
+      const today = new Date(); today.setHours(0,0,0,0); const todayISO = today.toISOString();
+      const { count: casesCount } = await _supabase.from('visits').select('*', { count: 'exact', head: true }).gte('visit_date', todayISO);
+      const { data: todayVisits } = await _supabase.from('visits').select('visit_id').gte('visit_date', todayISO);
+      let testsCount = 0;
+      if (todayVisits && todayVisits.length > 0) {
+        const vIds = todayVisits.map(v => v.visit_id);
+        const { count: tCount } = await _supabase.from('visit_tests').select('*', { count: 'exact', head: true }).in('visit_id', vIds);
+        testsCount = tCount || 0;
+      }
+      const { data: allVT } = await _supabase.from('visit_tests').select('id');
+      const { data: allRes } = await _supabase.from('test_results').select('visit_test_id');
+      const resIds = new Set((allRes || []).map(r => r.visit_test_id));
+      const pendingCount = (allVT || []).filter(vt => !resIds.has(vt.id)).length;
+      const { count: pubCount } = await _supabase.from('visits').select('*', { count: 'exact', head: true }).eq('is_published', true).gte('published_at', todayISO);
+      if(elCases) elCases.innerText = casesCount || 0;
+      if(elTests) elTests.innerText = testsCount;
+      if(elPending) elPending.innerText = pendingCount;
+      if(elPublished) elPublished.innerText = pubCount || 0;
+    } catch (err) {
+      if(elCases) elCases.innerText = '!'; if(elTests) elTests.innerText = '!'; if(elPending) elPending.innerText = '!'; if(elPublished) elPublished.innerText = '!';
+    }
+  };
+
+  /* ==============================================================
+     التقارير الكبيرة (المرحلة 5 و 6)
+     ============================================================== */
   window.renderMonthlyAdvisor = function() {
     const container = document.getElementById('advisorReport');
     if (!container) return;
     if (!salesWorkbook) { container.innerHTML = '<div class="advisor-card"><div class="advisor-card-title">👨‍⚕️ رسالة المستشار</div><div class="advisor-card-body">⚠️ ارفع ملف المتابعة السنوية أولاً عشان يظهر التقرير الشهري.</div></div>'; return; }
     const period = findLatestReportMonth();
     if (!period) { container.innerHTML = '<div class="advisor-card"><div class="advisor-card-title">👨‍⚕️ رسالة المستشار</div><div class="advisor-card-body">ℹ️ مفيش بيانات شهرية كافية لعرض التقرير.</div></div>'; return; }
+    
     const monthsAr = ['يناير','فبراير','مارس','ابريل','مايو','يونيو','يوليو','اغسطس','سبتمبر','اكتوبر','نوفمبر','ديسمبر'];
     const monthName = monthsAr[period.month - 1];
-    
     const currJ = extractMonthData(period.year, period.month, 'الجعافرة');
     const currB = extractMonthData(period.year, period.month, 'بهتيم');
-    const currRev = currJ.rev + currB.rev;
-    const currExp = currJ.exp + currB.exp;
-    const currCases = currJ.cases + currB.cases;
-    const currProfit = currRev - currExp;
+    const currRev = currJ.rev + currB.rev; const currExp = currJ.exp + currB.exp;
+    const currCases = currJ.cases + currB.cases; const currProfit = currRev - currExp;
     
-    let prevMonth = period.month - 1, prevYear = period.year;
-    if (prevMonth < 1) { prevMonth = 12; prevYear--; }
-    const prevJ = extractMonthData(prevYear, prevMonth, 'الجعافرة');
-    const prevB = extractMonthData(prevYear, prevMonth, 'بهتيم');
-    const prevRev = prevJ.rev + prevB.rev;
-    const prevProfit = (prevJ.rev + prevB.rev) - (prevJ.exp + prevB.exp);
-    
-    const lastYrJ = extractMonthData(period.year - 1, period.month, 'الجعافرة');
-    const lastYrB = extractMonthData(period.year - 1, period.month, 'بهتيم');
-    const lastYrRev = lastYrJ.rev + lastYrB.rev;
-    const lastYrProfit = (lastYrJ.rev + lastYrB.rev) - (lastYrJ.exp + lastYrB.exp);
+    let prevMonth = period.month - 1, prevYear = period.year; if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+    const prevJ = extractMonthData(prevYear, prevMonth, 'الجعافرة'); const prevB = extractMonthData(prevYear, prevMonth, 'بهتيم');
+    const prevRev = prevJ.rev + prevB.rev; const prevProfit = (prevJ.rev + prevB.rev) - (prevJ.exp + prevB.exp);
+    const lastYrJ = extractMonthData(period.year - 1, period.month, 'الجعافرة'); const lastYrB = extractMonthData(period.year - 1, period.month, 'بهتيم');
+    const lastYrRev = lastYrJ.rev + lastYrB.rev; const lastYrProfit = (lastYrJ.rev + lastYrB.rev) - (lastYrJ.exp + lastYrB.exp);
 
     let seasonalRevJ = 0, seasonalRevB = 0, seasonalCount = 0;
     for (let y = period.year - 1; y >= 2023; y--) {
-      const sJ = extractMonthData(y, period.month, 'الجعافرة');
-      const sB = extractMonthData(y, period.month, 'بهتيم');
+      const sJ = extractMonthData(y, period.month, 'الجعافرة'); const sB = extractMonthData(y, period.month, 'بهتيم');
       if (sJ.rev > 0 || sB.rev > 0) { seasonalRevJ += sJ.rev; seasonalRevB += sB.rev; seasonalCount++; }
     }
-    const avgSeasonalRevJ = seasonalCount > 0 ? seasonalRevJ / seasonalCount : 0;
-    const avgSeasonalRevB = seasonalCount > 0 ? seasonalRevB / seasonalCount : 0;
-    const avgSeasonalRevCombined = avgSeasonalRevJ + avgSeasonalRevB;
+    const avgSeasonalRevCombined = (seasonalCount > 0 ? (seasonalRevJ + seasonalRevB) / seasonalCount : 0);
     
-    const revMoM = growthInfo(currRev, prevRev);
-    const revYoY = growthInfo(currRev, lastYrRev);
-    const revSeasonal = growthInfo(currRev, avgSeasonalRevCombined);
-    const jMoM = growthInfo(currJ.rev, prevJ.rev);
-    const bMoM = growthInfo(currB.rev, prevB.rev);
-    const jYoY = growthInfo(currJ.rev, lastYrJ.rev);
-    const bYoY = growthInfo(currB.rev, lastYrB.rev);
-    const jSeasonal = growthInfo(currJ.rev, avgSeasonalRevJ);
-    const bSeasonal = growthInfo(currB.rev, avgSeasonalRevB);
+    const revMoM = growthInfo(currRev, prevRev); const revYoY = growthInfo(currRev, lastYrRev); const revSeasonal = growthInfo(currRev, avgSeasonalRevCombined);
+    const jMoM = growthInfo(currJ.rev, prevJ.rev); const bMoM = growthInfo(currB.rev, prevB.rev); const jYoY = growthInfo(currJ.rev, lastYrJ.rev); const bYoY = growthInfo(currB.rev, lastYrB.rev);
 
-    const now = new Date();
-    const isCurrentMonth = (period.year === now.getFullYear() && period.month === (now.getMonth() + 1));
+    const now = new Date(); const isCurrentMonth = (period.year === now.getFullYear() && period.month === (now.getMonth() + 1));
     const periodNote = isCurrentMonth ? '' : `<div class="advisor-period-note">ℹ️ الشهر الحالي لسه مكتملش، فالتقرير بيعرض <strong>آخر شهر مكتمل (${monthName} ${period.year})</strong>.</div>`;
     
     const recs = [];
@@ -568,7 +722,7 @@
     if (revSeasonal.pct < -15) { recs.push(`⚠️ <strong>تنبيه موسمي:</strong> إيراد الشهر ده أقل من المتوقع بناءً على تاريخ السنين اللي فاتت.`); }
     else if (revSeasonal.pct > 15) { recs.push(`🔥 <strong>إنجاز:</strong> إنت كسرت التوقع الموسمي لشهر ${monthName}!`); }
 
-    const messageHtml = `<div class="advisor-card"><div class="advisor-card-title">👨‍⚕️ رسالة المستشار <span class="advisor-period-badge">${monthName} ${period.year}</span></div>${periodNote}<div class="advisor-card-body">أهلاً يا دكتور أحمد،<br>تقرير <strong>${monthName} ${period.year}</strong> جاهز. الشهر ده حقق: <strong>${currRev.toLocaleString()} ج</strong> إيراد، <strong>${currProfit.toLocaleString()} ج</strong> ربح، و<strong>${currCases.toLocaleString()} حالة</strong>.<ul class="advisor-rec-list">${recs.map(r => `<li class="advisor-rec-item">${r}</li>`).join('')}</ul></div></div>`;
+    const messageHtml = `<div class="advisor-card"><div class="advisor-card-title">👨‍⚕️ رسالة المستشار <span class="advisor-period-badge">${monthName} ${period.year}</span></div>${periodNote}<div class="advisor-card-body">أهلاً يا دكتور،<br>تقرير <strong>${monthName} ${period.year}</strong> جاهز. الشهر ده حقق: <strong>${currRev.toLocaleString()} ج</strong> إيراد، <strong>${currProfit.toLocaleString()} ج</strong> ربح، و<strong>${currCases.toLocaleString()} حالة</strong>.<ul class="advisor-rec-list">${recs.map(r => `<li class="advisor-rec-item">${r}</li>`).join('')}</ul></div></div>`;
     
     const finCompareHtml = `<div class="advisor-section"><h4>💰 مقارنة مالية</h4><div class="advisor-compare-grid"><div class="advisor-compare-card"><div class="advisor-compare-label">الشهر الحالي (${monthName} ${period.year})</div><div class="advisor-compare-value" style="color:#16a34a;">${currRev.toLocaleString()} ج</div><div class="advisor-compare-growth" style="color:#94a3b8;">إيراد</div><div class="advisor-compare-profit">ربح ${currProfit.toLocaleString()} ج</div></div><div class="advisor-compare-card"><div class="advisor-compare-label">الشهر اللي فات (${monthsAr[prevMonth-1]} ${prevYear})</div><div class="advisor-compare-value" style="color:#00bfff;">${prevRev.toLocaleString()} ج</div><div class="advisor-compare-growth" style="color:${revMoM.color};">${revMoM.icon} ${revMoM.label}</div><div class="advisor-compare-profit">ربح ${prevProfit.toLocaleString()} ج</div></div><div class="advisor-compare-card"><div class="advisor-compare-label">نفس الشهر السنة اللي فاتت</div><div class="advisor-compare-value" style="color:#a78bfa;">${lastYrRev.toLocaleString()} ج</div><div class="advisor-compare-growth" style="color:${revYoY.color};">${revYoY.icon} ${revYoY.label} YoY</div><div class="advisor-compare-profit">ربح ${lastYrProfit.toLocaleString()} ج</div></div></div></div>`;
     const branchCompareHtml = `<div class="advisor-section"><h4>🏥 مقارنة الفروع</h4><div class="advisor-branch-grid">${['الجعافرة', 'بهتيم'].map(branch => { const d = branch === 'الجعافرة' ? currJ : currB; const prevD = branch === 'الجعافرة' ? prevJ : prevB; const g = growthInfo(d.rev, prevD.rev); const bMargin = d.rev > 0 ? ((d.rev - d.exp) / d.rev * 100) : 0; const status = bMargin >= 50 ? '✅ ممتاز' : bMargin >= 35 ? '👍 كويس' : '⚠️ محتاج مراجعة'; const statusColor = bMargin >= 50 ? '#16a34a' : bMargin >= 35 ? '#d97706' : '#dc2626'; return `<div class="advisor-branch-card"><h5>🏥 ${branch} <span style="color:${statusColor}; font-size:0.8rem;">${status}</span></h5><div class="advisor-branch-row"><span>الإيراد</span><strong style="color:#16a34a;">${d.rev.toLocaleString()} ج</strong></div><div class="advisor-branch-row"><span>المصروفات</span><strong style="color:#dc2626;">${d.exp.toLocaleString()} ج</strong></div><div class="advisor-branch-row"><span>الربح</span><strong style="color:#d97706;">${(d.rev - d.exp).toLocaleString()} ج</strong></div><div class="advisor-branch-row"><span>الحالات</span><strong style="color:#0284c7;">${d.cases.toLocaleString()}</strong></div><div class="advisor-branch-row"><span>التغير</span><strong style="color:${g.color};">${g.icon} ${g.label}</strong></div></div>`; }).join('')}</div></div>`;
@@ -594,10 +748,9 @@
     container.innerHTML = messageHtml + finCompareHtml + branchCompareHtml + testsHtml + alertsHtml;
   };
 
-  /* ============= خطة الشهر (المرحلة 4) ============= */
   function buildWeeklyPlan(ctx) {
     const weeks = [];
-    const { refMonthName, refMargin, refExp, losingTests, sleepingTests, topSellers, topProfitable, refRev, refExpRatio, avgInvoice, jRevGrowth, bRevGrowth, refJMargin, refBMargin } = ctx;
+    const { refMonthName, refMargin, refExp, losingTests, sleepingTests, topSellers, refRev, refExpRatio, avgInvoice, jRevGrowth, bRevGrowth, refJMargin, refBMargin } = ctx;
     const weakerBranch = refJMargin < refBMargin ? 'الجعافرة' : 'بهتيم';
     const weakerGrowth = refJMargin < refBMargin ? jRevGrowth : bRevGrowth;
     const targetAvg = Math.round(avgInvoice * 1.08);
@@ -655,7 +808,7 @@
 
   function buildTaskList(ctx) {
     const tasks = [];
-    const { refMargin, refExp, refExpRatio, refProfit, refMonthName, losingTests, sleepingTests, topSellers, topProfitable, jRevGrowth, bRevGrowth, avgInvoice } = ctx;
+    const { refMargin, refExp, refExpRatio, refProfit, losingTests, sleepingTests, topSellers, topProfitable, jRevGrowth, bRevGrowth, avgInvoice } = ctx;
     if (refMargin < 30) tasks.push({ priority: 'high', priorityAr: 'عالية', tag: 'financial', tagAr: 'مالي', title: `ارفع هامش الربح فوق 30%`, reason: `الهامش الحالي ${refMargin.toFixed(1)}% — أقل من الحد الآمن. راجع أعلى 3 بنود مصاريف (${refExp.toLocaleString()} ج).` });
     else if (refMargin < 40) tasks.push({ priority: 'medium', priorityAr: 'متوسطة', tag: 'financial', tagAr: 'مالي', title: `حسّن الهامش لـ 40%`, reason: `الهامش ${refMargin.toFixed(1)}% — كويس لكن ممكن يتحسن.` });
     if (refExpRatio > 60) tasks.push({ priority: 'high', priorityAr: 'عالية', tag: 'financial', tagAr: 'مالي', title: `قلل نسبة المصاريف/الإيراد`, reason: `النسبة ${refExpRatio.toFixed(1)}% — الهدف 55% أو أقل. خفض 5% = توفير ${(refExp * 0.05).toLocaleString()} ج.` });
@@ -693,7 +846,6 @@
     const container = document.getElementById('planContent');
     const subtitle = document.getElementById('planSubtitle');
     if (!container) return;
-
     if (!salesWorkbook) {
       container.innerHTML = `<div class="advisor-card"><div class="advisor-card-body">⚠️ ارفع ملف المتابعة السنوية أولاً عشان الخطة تظهر.</div></div>`;
       if (subtitle) subtitle.textContent = '⚠️ في انتظار رفع البيانات';
@@ -1329,27 +1481,16 @@
 
   /* ============= AI REAL API INTEGRATION ============= */
   window.copyAIReport = async function(type) {
-    if (!salesWorkbook) {
-      alert('⚠️ لازم ترفع ملفات الإكسل الأول عشان أقدر أحلل.');
-      return;
-    }
-
+    if (!salesWorkbook) { alert('⚠️ لازم ترفع ملفات الإكسل الأول عشان أقدر أحلل.'); return; }
     const period = findLatestReportMonth();
-    if (!period) {
-      alert('⚠️ مفيش بيانات كفاية.');
-      return;
-    }
+    if (!period) { alert('⚠️ مفيش بيانات كفاية.'); return; }
 
-    // 1. سحب الأرقام والبيانات
     const monthsAr = ['يناير','فبراير','مارس','ابريل','مايو','يونيو','يوليو','اغسطس','سبتمبر','اكتوبر','نوفمبر','ديسمبر'];
     const monthName = monthsAr[period.month - 1];
-    
     const currJ = extractMonthData(period.year, period.month, 'الجعافرة');
     const currB = extractMonthData(period.year, period.month, 'بهتيم');
-    const currRev = currJ.rev + currB.rev;
-    const currExp = currJ.exp + currB.exp;
-    const currProfit = currRev - currExp;
-    const currCases = currJ.cases + currB.cases;
+    const currRev = currJ.rev + currB.rev; const currExp = currJ.exp + currB.exp;
+    const currProfit = currRev - currExp; const currCases = currJ.cases + currB.cases;
     const margin = currRev > 0 ? (currProfit / currRev * 100).toFixed(1) : 0;
 
     const merged = getMergedData('combined');
@@ -1357,32 +1498,24 @@
     const losingTests = merged.filter(t => t.trueCost > t.sell && t.count > 0).sort((a, b) => a.trueProfitUnit - b.trueProfitUnit).slice(0, 5);
     const topSellers = [...merged].sort((a, b) => b.count - a.count).slice(0, 5);
 
-    // 2. بناء البرومبت (شامل مالي + عددي + تطوير + تشغيل)
     let prompt = `أنت الآن "مستشار مالي وتشغيلي واستراتيجي" خبير في إدارة المعامل الطبية. أنا الدكتور أحمد طه، صاحب "معامل طيبة".\n`;
-    prompt += `أحتاج منك تقريراً استشارياً شاملاً ومفصلاً (ليس تقييماً مالياً فقط). بناءً على البيانات التالية لشهر ${monthName} ${period.year}:\n\n`;
-    
+    prompt += `أحتاج منك تقريراً استشارياً شاملاً ومفصلاً. بناءً على البيانات التالية لشهر ${monthName} ${period.year}:\n\n`;
     prompt += `📊 **[1] المؤشرات المالية:**\n`;
     prompt += `- الإيراد: ${currRev.toLocaleString()} ج، المصاريف: ${currExp.toLocaleString()} ج، صافي الربح: ${currProfit.toLocaleString()} ج (هامش الربح ${margin}%).\n`;
     prompt += `- فرع الجعافرة: إيراد ${currJ.rev.toLocaleString()} ج، حالات ${currJ.cases.toLocaleString()} (متوسط فاتورة ${(currJ.rev/currJ.cases).toFixed(1)} ج).\n`;
     prompt += `- فرع بهتيم: إيراد ${currB.rev.toLocaleString()} ج، حالات ${currB.cases.toLocaleString()} (متوسط فاتورة ${(currB.rev/currB.cases).toFixed(1)} ج).\n`;
     prompt += `- إجمالي الحالات: ${currCases.toLocaleString()} حالة.\n\n`;
-
     prompt += `🔬 **[2] أداء التحاليل (بناءً على التكلفة الحقيقية):**\n`;
     prompt += `- الأكثر مبيعاً: ${topSellers.map(t => `${t.name} (${t.count} مرة)`).join('، ')}.\n`;
     prompt += `- الأكثر ربحاً: ${topProfitable.map(t => `${t.name} (ربح ${t.trueTotalProfit.toLocaleString()} ج)`).join('، ')}.\n`;
-    if (losingTests.length > 0) {
-      prompt += `- التحاليل الخاسرة: ${losingTests.map(t => `${t.name} (خسارة ${Math.abs(t.trueProfitUnit).toFixed(1)} ج/تحليل)`).join('، ')}.\n`;
-    }
-    prompt += `\n`;
-
-    prompt += `🎯 **المطلوب منك كخبير (اكتب تقرير مفصل ومقسم للعناوين دي):**\n`;
+    if (losingTests.length > 0) prompt += `- التحاليل الخاسرة: ${losingTests.map(t => `${t.name} (خسارة ${Math.abs(t.trueProfitUnit).toFixed(1)} ج/تحليل)`).join('، ')}.\n`;
+    prompt += `\n🎯 **المطلوب منك كخبير (اكتب تقرير مفصل ومقسم للعناوين دي):**\n`;
     prompt += `1. **التحليل المالي والعددي:** تقييم الأرباح، الهوامش، ومقارنة كفاءة الفروع (مين بيجيب حالات أكتر ومين فاتورته أعلى؟).\n`;
     prompt += `2. **التشغيل والحالات:** تحليل أعداد الحالات وعلاقتها بالإيراد، وإيه اللي ممكن يتحسن في استقبال الحالات.\n`;
     prompt += `3. **التطوير والتحاليل:** بناءً على بيانات التحاليل اللي فوق، إيه الفرص اللي ممكن نستغلها (زي تسويق التحاليل المربحة أو تعديل أسعار الخاسرة)؟\n`;
     prompt += `4. **خطة عمل تنفيذية (Action Plan):** اعطني 5 قرارات أو خطوات عملية ومحددة جداً عشان أنفذها الشهر القادم لتحسين التشغيل وزيادة الأرباح.\n`;
     prompt += `\n(ملاحظة: اكتب بلغة عربية واضحة ومباشرة، وبدون مقدمات إنشائية).`;
 
-    // 3. إظهار شاشة التحميل
     const modal = document.getElementById('aiModal');
     const body = document.getElementById('aiModalBody');
     if (modal && body) {
@@ -1390,54 +1523,30 @@
       modal.classList.add('show');
     }
 
-    // 4. الاتصال بالسيرفر بتاعك
     try {
       const response = await fetch('https://teba-ai.aabunada20.workers.dev/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: prompt })
       });
-
       const data = await response.json();
-      
       if (data.error) throw new Error(data.error);
-
-      // 5. عرض النتيجة داخل الموقع
       let aiText = data.result;
       aiText = aiText.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--gold); font-size:1.1rem;">$1</strong>');
       aiText = aiText.replace(/\n/g, '<br>');
       aiText = aiText.replace(/- (.*?)(<br>|$)/g, '<li style="margin-right:20px; margin-bottom:8px;">$1</li>');
-
-      if (body) {
-        body.innerHTML = `<div style="line-height: 1.8; font-size: 0.95rem;">${aiText}</div>`;
-      }
-
+      if (body) body.innerHTML = `<div style="line-height: 1.8; font-size: 0.95rem;">${aiText}</div>`;
     } catch (error) {
-      if (body) {
-        body.innerHTML = `<p style="color:#dc2626; font-weight:bold; text-align:center; padding:20px;">❌ حدث خطأ أثناء الاتصال بالمستشار الذكي: <br><br>${error.message}<br><br>تأكد من إعدادات الـ API Key في Cloudflare.</p>`;
-      }
+      if (body) body.innerHTML = `<p style="color:#dc2626; font-weight:bold; text-align:center; padding:20px;">❌ حدث خطأ أثناء الاتصال بالمستشار الذكي: <br><br>${error.message}<br><br>تأكد من إعدادات الـ API Key في Cloudflare.</p>`;
     }
   };
 
-  /* ============= Copy to Any AI (Legacy Fallback) ============= */
   window.copyToAnyAI = function(type) {
-    if (!salesWorkbook) {
-      alert('⚠️ لازم ترفع الملفات الأول عشان أقدر أطلع تقرير.');
-      return;
-    }
-    const period = findLatestReportMonth();
-    if (!period) return;
-
+    if (!salesWorkbook) { alert('⚠️ لازم ترفع الملفات الأول عشان أقدر أطلع تقرير.'); return; }
+    const period = findLatestReportMonth(); if (!period) return;
     const monthsAr = ['يناير','فبراير','مارس','ابريل','مايو','يونيو','يوليو','اغسطس','سبتمبر','اكتوبر','نوفمبر','ديسمبر'];
     const monthName = monthsAr[period.month - 1];
-    
-    const currJ = extractMonthData(period.year, period.month, 'الجعافرة');
-    const currB = extractMonthData(period.year, period.month, 'بهتيم');
-    const currRev = currJ.rev + currB.rev;
-    const currExp = currJ.exp + currB.exp;
-    const currProfit = currRev - currExp;
+    const currJ = extractMonthData(period.year, period.month, 'الجعافرة'); const currB = extractMonthData(period.year, period.month, 'بهتيم');
+    const currRev = currJ.rev + currB.rev; const currExp = currJ.exp + currB.exp; const currProfit = currRev - currExp;
     const margin = currRev > 0 ? (currProfit / currRev * 100).toFixed(1) : 0;
-    
     const merged = getMergedData('combined');
     const topProfitable = [...merged].sort((a, b) => b.trueTotalProfit - a.trueTotalProfit).slice(0, 5);
     const losingTests = merged.filter(t => t.trueCost > t.sell && t.count > 0).sort((a, b) => a.trueProfitUnit - b.trueProfitUnit).slice(0, 5);
@@ -1448,34 +1557,24 @@
     prompt += `- الإجمالي: إيراد ${currRev.toLocaleString()} ج، مصاريف ${currExp.toLocaleString()} ج، صافي ربح ${currProfit.toLocaleString()} ج (هامش ${margin}%).\n`;
     prompt += `- فرع الجعافرة: إيراد ${currJ.rev.toLocaleString()} ج، مصاريف ${currJ.exp.toLocaleString()} ج، عدد الحالات ${currJ.cases.toLocaleString()} حالة.\n`;
     prompt += `- فرع بهتيم: إيراد ${currB.rev.toLocaleString()} ج، مصاريف ${currB.exp.toLocaleString()} ج، عدد الحالات ${currB.cases.toLocaleString()} حالة.\n\n`;
-
-    prompt += `💎 **[2] التحاليل (بناءً على التكلفة الحقيقية):**\n`;
-    prompt += `- أفضل 5 تحاليل ربحية (النجوم):\n`;
+    prompt += `💎 **[2] التحاليل (بناءً على التكلفة الحقيقية):**\n- أفضل 5 تحاليل ربحية (النجوم):\n`;
     topProfitable.forEach((t, i) => { prompt += `  ${i+1}. ${t.name}: ربح صافي (${t.trueProfitUnit.toFixed(1)} ج)، إجمالي (${t.trueTotalProfit.toLocaleString()} ج).\n`; });
     if (losingTests.length > 0) {
       prompt += `- أسوأ 5 تحاليل (خاسرة):\n`;
       losingTests.forEach((t, i) => { prompt += `  ${i+1}. ${t.name}: سعر البيع ${t.sell} ج، التكلفة ${t.trueCost.toFixed(1)} ج (خسارة ${Math.abs(t.trueProfitUnit).toFixed(1)} ج/تحليل).\n`; });
     }
-    prompt += `\n🎯 **المطلوب منك كخبير:**\n`;
-    prompt += `1. **التحليل المالي والعددي:** تقييم الأرباح، الهوامش، ومقارنة كفاءة الفروع.\n`;
-    prompt += `2. **التشغيل والحالات:** تحليل أعداد الحالات وعلاقتها بالإيراد.\n`;
-    prompt += `3. **التطوير والتحاليل:** الفرص اللي ممكن نستغلها بناءً على بيانات التحاليل.\n`;
-    prompt += `4. **خطة عمل تنفيذية:** 5 قرارات عملية لتنفيذها الشهر القادم.\n`;
+    prompt += `\n🎯 **المطلوب منك كخبير:**\n1. **التحليل المالي والعددي:** تقييم الأرباح، الهوامش، ومقارنة كفاءة الفروع.\n2. **التشغيل والحالات:** تحليل أعداد الحالات وعلاقتها بالإيراد.\n3. **التطوير والتحاليل:** الفرص اللي ممكن نستغلها بناءً على بيانات التحاليل.\n4. **خطة عمل تنفيذية:** 5 قرارات عملية لتنفيذها الشهر القادم.\n`;
 
     navigator.clipboard.writeText(prompt).then(() => {
       const toast = document.createElement('div');
       toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg, #4d6bfe, #3b5bdb);color:#fff;padding:15px 30px;border-radius:12px;font-weight:bold;font-size:1.1rem;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);text-align:center;direction:rtl;';
-      toast.innerHTML = `✅ تم نسخ التقرير الشامل بنجاح!<br><span style="font-size:0.85rem;font-weight:normal;opacity:0.9;">افتح أي تطبيق ذكاء اصطناعي (ChatGPT, Gemini, DeepSeek...) والصق النص هناك.</span>`;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
-    }).catch(err => { alert('❌ فشل نسخ النص. المتصفح قد لا يدعم هذه الميزة. الخطأ: ' + err); });
+      toast.innerHTML = `✅ تم نسخ التقرير الشامل بنجاح!<br><span style="font-size:0.85rem;font-weight:normal;opacity:0.9;">افتح أي تطبيق ذكاء اصطناعي والصق النص هناك.</span>`;
+      document.body.appendChild(toast); setTimeout(() => toast.remove(), 4000);
+    }).catch(err => { alert('❌ فشل نسخ النص: ' + err); });
   };
 
-  /* ============= Table Search ============= */
   window.filterTable = function(input, tableId) {
-    const filter = input.value.toLowerCase();
-    const table = document.getElementById(tableId);
-    if (!table) return;
+    const filter = input.value.toLowerCase(); const table = document.getElementById(tableId); if (!table) return;
     const tr = table.getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
         const txtValue = (tr[i].textContent || tr[i].innerText).toLowerCase();
@@ -1485,7 +1584,6 @@
 
   /* ============= INIT ============= */
   initTheme();
-  
   if(isSessionValid()) showDashboard();
   const passInput = document.getElementById('adminPassword');
   if(passInput) passInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') window.checkAdminPassword(); });
@@ -1501,23 +1599,16 @@
   /* ============= PWA INSTALL LOGIC ============= */
   let deferredPrompt;
   window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
+    e.preventDefault(); deferredPrompt = e;
     const installBtn = document.getElementById('pwaInstallBtn');
     if (installBtn) installBtn.style.display = 'inline-flex'; 
   });
 
   window.installPWA = async function() {
-    if (!deferredPrompt) {
-      alert('التطبيق مثبت بالفعل أو متصفحك لا يدعم هذه الميزة.');
-      return;
-    }
+    if (!deferredPrompt) { alert('التطبيق مثبت بالفعل أو متصفحك لا يدعم هذه الميزة.'); return; }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      const installBtn = document.getElementById('pwaInstallBtn');
-      if (installBtn) installBtn.style.display = 'none';
-    }
+    if (outcome === 'accepted') { const installBtn = document.getElementById('pwaInstallBtn'); if (installBtn) installBtn.style.display = 'none'; }
     deferredPrompt = null;
   };
 })();
