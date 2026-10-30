@@ -15,6 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap" rel="stylesheet">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- مكتبة Dexie للأوفلاين -->
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="../config.js"></script>
     <style>
@@ -108,7 +109,7 @@
 
             .print-header {
                 position: fixed;
-                top: -32mm; /* ظبطنا الرقم ده عشان يبان في كل الصفحات */
+                top: -32mm;
                 left: 0;
                 width: 100%;
                 height: 28mm;
@@ -140,7 +141,6 @@
             .modal-content { box-shadow: none; padding: 0; border: none; max-height: none; overflow: visible; }
             .btn-print-modal, .btn-close { display: none !important; }
             
-            /* تكبير اللوجو وتغميقه شوية عشان يطبع واضح */
             .print-header img { filter: contrast(1.5) brightness(0.8); }
         }
 
@@ -403,6 +403,7 @@
             crystalsSelect.innerHTML = '<option value="">-- اختر --</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
         }
 
+        // ==== عرض بيانات المريض والتحاليل ====
         function selectPatient(visitId) {
             selectedVisitId = visitId;
             renderPatients();
@@ -629,21 +630,23 @@
                 return;
             }
 
+            // 1. لو مفيش نت -> حفظ محلي
             if (!navigator.onLine) {
                 await db.offline_results.put({
                     visitTestId: visitTestId,
                     visitId: vt.visit_id,
                     resultsData: resultsData,
-                    tenant_id: TEBA_CONFIG.tenant.id 
+                    tenant_id: TEBA_CONFIG.tenant.id
                 });
                 document.getElementById('syncBtn').style.display = 'flex';
-                if (!isSilent) showToast('⚠️ النت مقطوع! تم الحفظ محلياً.', true);
+                if (!isSilent) showToast('⚠️ النت مقطوع! تم الحفظ محلياً. سيتم المزامنة لاحقاً.', true);
                 const existingIndex = testResults.findIndex(r => r.visit_test_id === visitTestId);
                 if (existingIndex > -1) testResults[existingIndex].results_data = resultsData;
                 else testResults.push({ visit_test_id: visitTestId, results_data: resultsData });
                 return;
             }
 
+            // 2. لو فيه نت -> حفظ في السحابة
             const { error } = await _supabase.from('test_results').upsert({
                 tenant_id: TEBA_CONFIG.tenant.id,
                 visit_test_id: visitTestId,
@@ -684,28 +687,39 @@
             btn.innerText = '⏳...'; btn.disabled = true;
 
             try {
+                // 1. تحديث الكتالوج عشان الباراميتر يظهر لكل المرضى الجايين
                 const catalogItem = testsCatalog.find(c => c.code === testCode);
                 if (catalogItem) {
                     let currentParams = catalogItem.parameters || [];
                     if (!currentParams.find(p => p.name.toLowerCase() === paramName.toLowerCase())) {
-                        currentParams.push({ name: paramName, label: paramName, unit: paramUnit, type: 'text' });
+                        currentParams.push({
+                            name: paramName,
+                            label: paramName,
+                            unit: paramUnit,
+                            type: 'text'
+                        });
                         await _supabase.from('tests_catalog').update({ parameters: currentParams }).eq('id', catalogItem.id).eq('tenant_id', TEBA_CONFIG.tenant.id);
                         catalogItem.parameters = currentParams; 
                     }
                 }
 
+                // 2. حفظ النتيجة للمريض الحالي
                 const result = testResults.find(r => r.visit_test_id == vtId);
                 let resultsData = result ? result.results_data : {};
                 resultsData[paramName] = { value: paramValue };
 
                 await _supabase.from('test_results').upsert({
-                    tenant_id: TEBA_CONFIG.tenant.id, visit_test_id: vtId, results_data: resultsData
+                    tenant_id: TEBA_CONFIG.tenant.id,
+                    visit_test_id: vtId,
+                    results_data: resultsData
                 }, { onConflict: 'visit_test_id' });
 
+                // 3. إعادة رسم الكروت عشان الباراميتر الجديد يظهر
                 document.getElementById('quickAddModal').style.display = 'none';
                 await loadData(); 
                 selectPatient(selectedVisitId);
                 showToast('✅ تم إضافة الباراميتر وحفظ النتيجة');
+
             } catch(err) {
                 alert('❌ خطأ: ' + err.message);
             } finally {
@@ -713,15 +727,15 @@
             }
         }
 
-        // ==== المزامنة ====
+        // ==== مزامنة البيانات المحفوظة أوفلاين ====
         async function syncOfflineData() {
             const pending = await db.offline_results.toArray();
             if (pending.length === 0) {
-                showToast('✅ لا توجد بيانات معلقة.');
+                showToast('✅ لا توجد بيانات معلقة للمزامنة.');
                 document.getElementById('syncBtn').style.display = 'none';
                 return;
             }
-            if (!navigator.onLine) return alert('لا يوجد اتصال بالإنترنت!');
+            if (!navigator.onLine) return alert('لا يوجد اتصال بالإنترنت! يرجى توصيل النت أولاً.');
 
             const btn = document.getElementById('syncBtn');
             btn.innerText = '⏳ جاري المزامنة...';
@@ -730,14 +744,19 @@
             for (let p of pending) {
                 try {
                     const { error } = await _supabase.from('test_results').upsert({
-                        tenant_id: p.tenant_id, visit_test_id: p.visitTestId, results_data: p.resultsData
+                        tenant_id: p.tenant_id,
+                        visit_test_id: p.visitTestId,
+                        results_data: p.resultsData
                     }, { onConflict: 'visit_test_id' });
                     
-                    if (!error) { await db.offline_results.delete(p.id); successCount++; }
-                } catch(e) { console.error(e); }
+                    if (!error) {
+                        await db.offline_results.delete(p.id);
+                        successCount++;
+                    }
+                } catch(e) { console.error("Sync error for result", p.id, e); }
             }
 
-            if (successCount > 0) showToast(`✅ تم مزامنة ${successCount} نتيجة!`);
+            if (successCount > 0) showToast(`✅ تم مزامنة ${successCount} نتيجة بنجاح!`);
             if (await db.offline_results.count() === 0) btn.style.display = 'none';
             else btn.innerText = '🔄 مزامنة البيانات';
             
@@ -750,27 +769,31 @@
             if (!selectedVisitId) return;
             const visitObj = allVisits.find(v => v.visit_id === selectedVisitId);
             const vTests = visitTests.filter(vt => vt.visit_id === selectedVisitId);
-            if (vTests.length === 0) return alert('لا يوجد تحاليل لنشرها.');
+            if (vTests.length === 0) return alert('لا يوجد تحاليل في هذه الزيارة لنشرها.');
             let completedTests = 0;
             vTests.forEach(vt => {
                 const res = testResults.find(r => r.visit_test_id === vt.id);
                 if (res && res.results_data && Object.keys(res.results_data).length > 0) completedTests++;
             });
             const pendingTests = vTests.length - completedTests;
-            if (!confirm(`أنت على وشك نشر الزيارة.\n\nجاهز: ${completedTests}\nقيد التشغيل: ${pendingTests}\n\nهل أنت متأكد؟`)) return;
+            if (!confirm(`أنت على وشك نشر الزيارة للمريض.\n\nالتحاليل الجاهزة: ${completedTests}\nالتحاليل قيد التشغيل: ${pendingTests}\n\nهل أنت متأكد من النشر/التحديث؟`)) return;
             try {
                 const { error } = await _supabase.from('visits').update({
-                    is_published: true, published_at: new Date().toISOString()
+                    is_published: true,
+                    published_at: new Date().toISOString()
                 }).eq('visit_id', selectedVisitId).eq('tenant_id', TEBA_CONFIG.tenant.id);
                 if (error) throw error;
                 visitObj.is_published = true;
+                visitObj.published_at = new Date().toISOString();
                 selectPatient(selectedVisitId); 
-                showToast(`✅ تم النشر`);
-            } catch (err) { alert('خطأ: ' + err.message); }
+                showToast(`✅ تم النشر (${completedTests} جاهز، ${pendingTests} قيد التشغيل)`);
+            } catch (err) {
+                alert('خطأ أثناء النشر: ' + err.message);
+            }
         }
 
         async function deleteVisitTest(visitTestId, visitId) {
-            if(!confirm('حذف هذا التحليل نهائياً؟')) return;
+            if(!confirm('هل أنت متأكد من حذف هذا التحليل نهائياً من الطلب؟')) return;
             try {
                 await _supabase.from('test_results').delete().eq('visit_test_id', visitTestId).eq('tenant_id', TEBA_CONFIG.tenant.id);
                 await _supabase.from('visit_tests').delete().eq('id', visitTestId).eq('tenant_id', TEBA_CONFIG.tenant.id);
@@ -779,13 +802,13 @@
                 const vtIndex = visitTests.findIndex(v => v.id === visitTestId);
                 if(vtIndex > -1) visitTests.splice(vtIndex, 1);
                 selectPatient(visitId);
-                showToast('🗑️ تم الحذف');
+                showToast('🗑️ تم حذف التحليل');
             } catch (err) { alert('خطأ: ' + err.message); }
         }
 
-        // ==== إضافة تحليل ====
+        // ==== إضافة تحليل جديد للمريض ====
         function openAddTestModal() {
-            if(!selectedVisitId) return alert('اختر مريضاً!');
+            if(!selectedVisitId) return alert('اختر مريضاً أولاً!');
             document.getElementById('addTestModal').style.display = 'flex';
             document.getElementById('addTestSearch').value = '';
             filterAddTest();
@@ -798,7 +821,7 @@
             const currentTestCodes = visitTests.filter(vt => vt.visit_id === selectedVisitId).map(vt => vt.test_code);
             const available = filtered.filter(t => !currentTestCodes.includes(t.code));
             if(available.length === 0) {
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">لا توجد تحاليل متاحة</div>';
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">لا توجد تحاليل مطابقة أو متاحة للإضافة</div>';
                 return;
             }
             container.innerHTML = available.map(t => `
@@ -812,37 +835,34 @@
             if(!selectedVisitId) return;
             try {
                 const { error } = await _supabase.from('visit_tests').insert([{ 
-                    tenant_id: TEBA_CONFIG.tenant.id, visit_id: selectedVisitId, test_code: code, price_at_time: 0 
+                    tenant_id: TEBA_CONFIG.tenant.id,
+                    visit_id: selectedVisitId, 
+                    test_code: code, 
+                    price_at_time: 0 
                 }]);
                 if(error) throw error;
                 await loadData(); 
                 selectPatient(selectedVisitId);
                 document.getElementById('addTestModal').style.display = 'none';
-                showToast(`✅ تم إضافة ${name}`);
-            } catch(err) { alert('خطأ: ' + err.message); }
-        }
-
-        // ==== الطباعة ====
+                showToast(`✅ تم إضافة ${name} بنجاح`);
+            } catch(err) { alert('خطأ في الإضافة: ' + err.message); }
+        }        // ==== الطباعة ====
         function getHeaderHtml(visit, reqDate, printDate) {
             let ageStr = visit.patient.age + ' Years';
             if(visit.patient.age_type === 'Months') ageStr = visit.patient.age + ' Months';
             if(visit.patient.age_type === 'Days') ageStr = visit.patient.age + ' Days';
-            
-            // اللوجو هنا في الـ print-header
             return `
                 <div class="print-header">
-                    <div style="width: 50%; text-align: left; padding-left: 15px;">
-                        <h1 style="margin: 0; color: #000; font-size: 26px; font-weight: 900; letter-spacing: 1px;">${TEBA_CONFIG.lab.nameEn}</h1>
-                        <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 600; color: #000;">For Medical Analyzes</p>
+                    <div style="width: 50%; text-align: left;">
+                        <h1 style="margin: 0; color: #000; font-size: 28px; font-weight: 900; letter-spacing: 1px;">${TEBA_CONFIG.lab.nameEn}</h1>
+                        <p style="margin: 4px 0 0 0; font-size: 15px; font-weight: 600; color: #000;">For Medical Analyzes</p>
                         <p style="margin: 2px 0 0 0; font-size: 14px; color: #333;">${TEBA_CONFIG.lab.doctor}</p>
                     </div>
-                    <div style="width: 50%; display: flex; justify-content: flex-end; padding-right: 15px;">
-                        <img src="../header.png" alt="Logo" style="max-height: 70px; object-fit: contain;">
+                    <div style="width: 50%; display: flex; justify-content: flex-end;">
+                        <img src="../header.png" alt="Logo" style="max-height: 90px; object-fit: contain;" onerror="this.style.display='none'">
                     </div>
                 </div>
-                
-                <!-- معلومات المريض -->
-                <div style="display: flex; justify-content: space-between; border: 1.5px solid #000; padding: 10px 15px; border-radius: 4px; background: #fff; font-size: 13px; margin-bottom: 15px; position: relative;">
+                <div style="display: flex; justify-content: space-between; border: 1.5px solid #000; padding: 10px 15px; border-radius: 4px; background: #fff; font-size: 13px; margin-bottom: 20px; z-index: 2; position: relative;">
                     <div style="width: 50%; display: flex; flex-direction: column; gap: 5px;">
                         <div><strong style="color: #000; display: inline-block; width: 100px;">Patient:</strong> <span style="font-weight: bold;">${visit.patient.name || 'Unknown'}</span></div>
                         <div><strong style="color: #000; display: inline-block; width: 100px;">Age/Gender:</strong> <span style="font-weight: bold;">${ageStr} / ${visit.patient.gender}</span></div>
@@ -858,17 +878,22 @@
         }
 
         function getFooterHtml() {
-            // الفوتر هنا فيه العناوين كاملة زي الصورة اللي إنت بعتها
+            // التعديل الجديد: العناوين يمين، والأرقام شمال، والأيقونات
             return `
-                <div class="print-footer">
-                    <div style="width: 40%; text-align: left; direction: ltr; padding-left: 15px;">
-                        <p style="margin: 4px 0; font-weight: bold; font-size: 12px; color: #000;">Tel: ${TEBA_CONFIG.lab.phone}</p>
-                        <p style="margin: 4px 0; font-weight: bold; font-size: 12px; color: #000;">WhatsApp: ${TEBA_CONFIG.lab.whatsapp}</p>
+                <div class="print-footer" style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; width: 100%; border-top: 2px solid #000; padding-top: 10px; font-size: 13px; color: #000;">
+                    
+                    <!-- الشمال: الأرقام -->
+                    <div style="width: 35%; text-align: left; direction: ltr; font-weight: bold; line-height: 1.8;">
+                        <p style="margin: 0;">📞 01123702062</p>
+                        <p style="margin: 0;">📱 01099003494</p>
                     </div>
-                    <div style="width: 60%; text-align: right; direction: rtl; color: #000; font-weight: bold; font-size: 11px; line-height: 1.5; padding-right: 15px;">
-                        <p style="margin: 2px 0;">الفرع الأول: الجعافرة - الطريق العمومي - أعلى صيدلية الصحابة</p>
-                        <p style="margin: 2px 0;">الفرع الثاني: بهتيم - مساكن اسكو - أمام مدرسة ابن الخطاب - عيادة د. محمد رمضان</p>
+                    
+                    <!-- اليمين: العناوين -->
+                    <div style="width: 65%; text-align: right; direction: rtl; font-weight: bold; line-height: 1.8;">
+                        <p style="margin: 0;">الفرع الأول: الجعافرة - الطريق العمومي - أعلى صيدلية الصحابة</p>
+                        <p style="margin: 0;">الفرع الثاني: بهتيم - مساكن اسكو - أمام مدرسة ابن الخطاب - عيادة د. محمد رمضان</p>
                     </div>
+
                 </div>
             `;
         }
@@ -881,6 +906,7 @@
             const printDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
             const printArea = document.getElementById('print-area');
             printArea.innerHTML = '';
+            
             let singlesRows = '';
             let profilesData = []; 
             vTests.forEach(vt => {
@@ -943,26 +969,34 @@
                     }
                 }
             });
+
+            let htmlContent = getHeaderHtml(visit, reqDate, printDate); // الهيدر الثابت
+
             if (singlesRows !== '' || profilesData.length === 0) {
                 let pageHtml = `<div class="print-page">`;
-                pageHtml += getHeaderHtml(visit, reqDate, printDate);
+                pageHtml += `<div>`;
                 if (singlesRows !== '') {
                     pageHtml += `<div style="margin-bottom: 25px;"><h3 style="margin: 0 0 10px 0; background: #eee; padding: 8px 12px; border-left: 4px solid #000; font-size: 15px; text-transform: uppercase; color: #000;">SINGLE TESTS</h3><table style="width: 100%; border-collapse: collapse; font-size: 13px;"><thead><tr style="background: #000; color: #fff;"><th style="padding: 8px 6px; text-align:left;">Test Name</th><th style="padding: 8px 6px; text-align:center;">Result</th><th style="padding: 8px 6px; text-align:center;">State</th><th style="padding: 8px 6px; text-align:center;">Unit</th><th style="padding: 8px 6px; text-align:center;">Ref. Range</th></tr></thead><tbody>${singlesRows}</tbody></table></div>`;
                 } else {
                     pageHtml += `<p style="text-align:center; font-weight:bold; margin-top:50px;">No results recorded for this visit.</p>`;
                 }
-                pageHtml += getFooterHtml();
                 pageHtml += `</div>`;
-                printArea.innerHTML += pageHtml;
+                pageHtml += `</div>`;
+                htmlContent += pageHtml;
             }
+
             profilesData.forEach(profile => {
                 let pageHtml = `<div class="print-page">`;
-                pageHtml += getHeaderHtml(visit, reqDate, printDate);
+                pageHtml += `<div>`;
                 pageHtml += `<div style="margin-bottom: 25px;"><h3 style="margin: 0 0 10px 0; background: #eee; padding: 8px 12px; border-left: 4px solid #000; font-size: 15px; text-transform: uppercase; color: #000;">${profile.name}</h3><table style="width: 100%; border-collapse: collapse; font-size: 13px;"><thead><tr style="background: #000; color: #fff;"><th style="padding: 8px 6px; text-align:left;">Test Name</th><th style="padding: 8px 6px; text-align:center;">Result</th><th style="padding: 8px 6px; text-align:center;">State</th><th style="padding: 8px 6px; text-align:center;">Unit</th><th style="padding: 8px 6px; text-align:center;">Ref. Range</th></tr></thead><tbody>${profile.rows}</tbody></table></div>`;
-                pageHtml += getFooterHtml();
                 pageHtml += `</div>`;
-                printArea.innerHTML += pageHtml;
+                pageHtml += `</div>`;
+                htmlContent += pageHtml;
             });
+
+            htmlContent += getFooterHtml(); // الفوتر الثابت
+
+            printArea.innerHTML = htmlContent;
             document.getElementById('printModal').style.display = 'flex';
         }
 
@@ -971,11 +1005,12 @@
             await loadData(); 
             if (await db.offline_results.count() > 0) {
                 document.getElementById('syncBtn').style.display = 'flex';
-                showToast('⚠️ يوجد نتائج محفوظة محلياً.', true);
+                showToast('⚠️ يوجد نتائج محفوظة محلياً لم تتم مزامنتها بعد.', true);
             }
         };
     </script>
 
+    <!-- سكريبت تفعيل الـ PWA -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
