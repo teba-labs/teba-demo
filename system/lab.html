@@ -15,7 +15,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap" rel="stylesheet">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- مكتبة Dexie للأوفلاين -->
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="../config.js"></script>
     <style>
@@ -30,17 +29,11 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: var(--font); background-color: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* الهيدر */
         header { background: var(--surface); color: var(--text); display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); z-index: 10; border-bottom: 3px solid var(--primary); }
         .brand-info { font-weight: 800; font-size: 1.2rem; color: var(--primary); display: flex; align-items: center; gap: 10px;}
         
         .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
-        .nav-btn { 
-            border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; 
-            font-weight: bold; font-family: inherit; font-size: 0.9rem; 
-            display: flex; align-items: center; gap: 6px; transition: 0.2s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: white;
-        }
+        .nav-btn { border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: inherit; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: white;}
         .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         
         .btn-home { background: #64748b; }
@@ -50,7 +43,6 @@
         .btn-sync { background: var(--gold); display: none; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-        /* التخطيط */
         .main-grid { display: grid; grid-template-columns: 300px 1fr 1fr; gap: 15px; padding: 15px; flex-grow: 1; height: calc(100vh - 70px); overflow: hidden; }
         .panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; border: 1px solid var(--border); overflow: hidden; }
         .panel-header { background: var(--surface-hover); padding: 15px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--primary); text-align: center; font-size: 1.1rem;}
@@ -90,41 +82,71 @@
         #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--primary); color: white; padding: 15px 30px; border-radius: 30px; font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: none; z-index: 1000; }
         #toast.error { background: var(--danger); }
 
-        /* المودالز */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(3px); padding: 10px;}
         .modal-content { background: var(--surface); padding: 25px; border-radius: 12px; width: 100%; max-width: 900px; max-height: 95vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
         
         .btn-print-modal { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1rem; margin-top: 15px; }
         .btn-print-modal:hover { background: var(--primary-hover); }
 
-        /* تنسيقات الطباعة */
-        .print-page { background: #fff; width: 100%; min-height: 297mm; padding: 15mm; margin-bottom: 20px; box-sizing: border-box; position: relative; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; }
-        .print-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; z-index: 2; position: relative; }
-        .print-footer { position: static; width: 100%; border-top: 2px solid #000; padding-top: 10px; font-size: 12px; display: flex; justify-content: space-between; margin-top: auto; }
-
+        /* ==========================================
+           Print Styles (Fixed Header & Footer)
+           ========================================== */
+        .print-page { 
+            background: #fff; 
+            width: 100%; 
+            margin-bottom: 20px; 
+            position: relative; 
+        }
+        
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0;}
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+
+            /* مساحات ورق A4 عشان الهيدر والفوتر ياخدوا مكانهم */
+            @page { size: A4; margin: 40mm 15mm 35mm 15mm; }
+
+            .print-header {
+                position: fixed;
+                top: -32mm; /* ظبطنا الرقم ده عشان يبان في كل الصفحات */
+                left: 0;
+                width: 100%;
+                height: 28mm;
+                background: #fff;
+                border-bottom: 2px solid #000;
+                padding-bottom: 5px;
+                z-index: 1000;
+            }
+            
+            .print-footer {
+                position: fixed;
+                bottom: -28mm;
+                left: 0;
+                width: 100%;
+                height: 22mm;
+                background: #fff;
+                border-top: 2px solid #000;
+                padding-top: 8px;
+                z-index: 1000;
+            }
+
+            .print-page { 
+                border: none; box-shadow: none; margin: 0; padding: 0; 
+                page-break-after: always; 
+            }
+            .print-page:last-child { page-break-after: auto; }
+            
             .modal { position: absolute; background: transparent; display: block !important; padding: 0;}
             .modal-content { box-shadow: none; padding: 0; border: none; max-height: none; overflow: visible; }
             .btn-print-modal, .btn-close { display: none !important; }
-            .print-page { border: none; box-shadow: none; margin: 0; page-break-after: always; min-height: 100vh; }
-            @page { size: A4; margin: 0; }
+            
+            /* تكبير اللوجو وتغميقه شوية عشان يطبع واضح */
+            .print-header img { filter: contrast(1.5) brightness(0.8); }
         }
 
-        /* ==========================================
-           Responsive Design (Mobile & Tablet)
-           ========================================== */
         @media (max-width: 1024px) {
             body { overflow-y: auto; height: auto; }
-            .main-grid { 
-                grid-template-columns: 1fr; 
-                height: auto; 
-                overflow: visible;
-                padding-bottom: 50px;
-            }
-            /* إعطاء ارتفاع ثابت للبانل على الموبايل عشان تبقى مريحة */
+            .main-grid { grid-template-columns: 1fr; height: auto; overflow: visible; padding-bottom: 50px; }
             .panel { min-height: 350px; max-height: 450px; }
             header { flex-direction: column; gap: 10px; padding: 15px; text-align: center; }
             .header-actions { justify-content: center; }
@@ -162,7 +184,6 @@
         </div>
     </div>
 
-    <!-- مودال إضافة تحليل للمريض -->
     <div class="modal" id="addTestModal">
         <div class="modal-content" style="max-width: 700px;">
             <h3 style="margin-bottom: 15px; color: var(--primary);">➕ إضافة تحليل جديد للحالة</h3>
@@ -171,7 +192,6 @@
         </div>
     </div>
 
-    <!-- مودال الإضافة السريعة للباراميتر -->
     <div class="modal" id="quickAddModal">
         <div class="modal-content" style="max-width: 450px;">
             <h3 style="margin-bottom: 15px; color: #8b5cf6;">➕ إضافة باراميتر سريع</h3>
@@ -196,7 +216,6 @@
         </div>
     </div>
 
-    <!-- مودال الطباعة -->
     <div class="modal" id="printModal">
         <div class="modal-content" style="background: #e0e0e0; max-width: 1000px;">
             <div id="print-area" style="direction: ltr; text-align: left; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #000;"></div>
@@ -384,7 +403,6 @@
             crystalsSelect.innerHTML = '<option value="">-- اختر --</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
         }
 
-        // ==== عرض بيانات المريض والتحاليل ====
         function selectPatient(visitId) {
             selectedVisitId = visitId;
             renderPatients();
@@ -611,25 +629,23 @@
                 return;
             }
 
-            // 1. لو مفيش نت -> حفظ محلي
             if (!navigator.onLine) {
                 await db.offline_results.put({
                     visitTestId: visitTestId,
                     visitId: vt.visit_id,
                     resultsData: resultsData,
-                    tenant_id: TEBA_CONFIG.tenant.id // ID ديناميكي
+                    tenant_id: TEBA_CONFIG.tenant.id 
                 });
                 document.getElementById('syncBtn').style.display = 'flex';
-                if (!isSilent) showToast('⚠️ النت مقطوع! تم الحفظ محلياً. سيتم المزامنة لاحقاً.', true);
+                if (!isSilent) showToast('⚠️ النت مقطوع! تم الحفظ محلياً.', true);
                 const existingIndex = testResults.findIndex(r => r.visit_test_id === visitTestId);
                 if (existingIndex > -1) testResults[existingIndex].results_data = resultsData;
                 else testResults.push({ visit_test_id: visitTestId, results_data: resultsData });
                 return;
             }
 
-            // 2. لو فيه نت -> حفظ في السحابة
             const { error } = await _supabase.from('test_results').upsert({
-                tenant_id: TEBA_CONFIG.tenant.id, // ID ديناميكي
+                tenant_id: TEBA_CONFIG.tenant.id,
                 visit_test_id: visitTestId,
                 results_data: resultsData
             }, { onConflict: 'visit_test_id' });
@@ -644,7 +660,7 @@
             else showToast('💾 تم الحفظ تلقائياً');
         }
 
-        // ==== الإضافة السريعة للباراميتر (الميزة الجديدة) ====
+        // ==== الإضافة السريعة للباراميتر ====
         function openQuickAddModal(vtId, testCode) {
             document.getElementById('qaVisitTestId').value = vtId;
             document.getElementById('qaTestCode').value = testCode;
@@ -668,39 +684,28 @@
             btn.innerText = '⏳...'; btn.disabled = true;
 
             try {
-                // 1. تحديث الكتالوج عشان الباراميتر يظهر لكل المرضى الجايين (لنفس المعمل)
                 const catalogItem = testsCatalog.find(c => c.code === testCode);
                 if (catalogItem) {
                     let currentParams = catalogItem.parameters || [];
                     if (!currentParams.find(p => p.name.toLowerCase() === paramName.toLowerCase())) {
-                        currentParams.push({
-                            name: paramName,
-                            label: paramName,
-                            unit: paramUnit,
-                            type: 'text'
-                        });
+                        currentParams.push({ name: paramName, label: paramName, unit: paramUnit, type: 'text' });
                         await _supabase.from('tests_catalog').update({ parameters: currentParams }).eq('id', catalogItem.id).eq('tenant_id', TEBA_CONFIG.tenant.id);
                         catalogItem.parameters = currentParams; 
                     }
                 }
 
-                // 2. حفظ النتيجة للمريض الحالي
                 const result = testResults.find(r => r.visit_test_id == vtId);
                 let resultsData = result ? result.results_data : {};
                 resultsData[paramName] = { value: paramValue };
 
                 await _supabase.from('test_results').upsert({
-                    tenant_id: TEBA_CONFIG.tenant.id,
-                    visit_test_id: vtId,
-                    results_data: resultsData
+                    tenant_id: TEBA_CONFIG.tenant.id, visit_test_id: vtId, results_data: resultsData
                 }, { onConflict: 'visit_test_id' });
 
-                // 3. إعادة رسم الكروت عشان الباراميتر الجديد يظهر
                 document.getElementById('quickAddModal').style.display = 'none';
                 await loadData(); 
                 selectPatient(selectedVisitId);
                 showToast('✅ تم إضافة الباراميتر وحفظ النتيجة');
-
             } catch(err) {
                 alert('❌ خطأ: ' + err.message);
             } finally {
@@ -708,15 +713,15 @@
             }
         }
 
-        // ==== مزامنة البيانات المحفوظة أوفلاين ====
+        // ==== المزامنة ====
         async function syncOfflineData() {
             const pending = await db.offline_results.toArray();
             if (pending.length === 0) {
-                showToast('✅ لا توجد بيانات معلقة للمزامنة.');
+                showToast('✅ لا توجد بيانات معلقة.');
                 document.getElementById('syncBtn').style.display = 'none';
                 return;
             }
-            if (!navigator.onLine) return alert('لا يوجد اتصال بالإنترنت! يرجى توصيل النت أولاً.');
+            if (!navigator.onLine) return alert('لا يوجد اتصال بالإنترنت!');
 
             const btn = document.getElementById('syncBtn');
             btn.innerText = '⏳ جاري المزامنة...';
@@ -725,19 +730,14 @@
             for (let p of pending) {
                 try {
                     const { error } = await _supabase.from('test_results').upsert({
-                        tenant_id: p.tenant_id,
-                        visit_test_id: p.visitTestId,
-                        results_data: p.resultsData
+                        tenant_id: p.tenant_id, visit_test_id: p.visitTestId, results_data: p.resultsData
                     }, { onConflict: 'visit_test_id' });
                     
-                    if (!error) {
-                        await db.offline_results.delete(p.id);
-                        successCount++;
-                    }
-                } catch(e) { console.error("Sync error for result", p.id, e); }
+                    if (!error) { await db.offline_results.delete(p.id); successCount++; }
+                } catch(e) { console.error(e); }
             }
 
-            if (successCount > 0) showToast(`✅ تم مزامنة ${successCount} نتيجة بنجاح!`);
+            if (successCount > 0) showToast(`✅ تم مزامنة ${successCount} نتيجة!`);
             if (await db.offline_results.count() === 0) btn.style.display = 'none';
             else btn.innerText = '🔄 مزامنة البيانات';
             
@@ -750,31 +750,27 @@
             if (!selectedVisitId) return;
             const visitObj = allVisits.find(v => v.visit_id === selectedVisitId);
             const vTests = visitTests.filter(vt => vt.visit_id === selectedVisitId);
-            if (vTests.length === 0) return alert('لا يوجد تحاليل في هذه الزيارة لنشرها.');
+            if (vTests.length === 0) return alert('لا يوجد تحاليل لنشرها.');
             let completedTests = 0;
             vTests.forEach(vt => {
                 const res = testResults.find(r => r.visit_test_id === vt.id);
                 if (res && res.results_data && Object.keys(res.results_data).length > 0) completedTests++;
             });
             const pendingTests = vTests.length - completedTests;
-            if (!confirm(`أنت على وشك نشر الزيارة للمريض.\n\nالتحاليل الجاهزة: ${completedTests}\nالتحاليل قيد التشغيل: ${pendingTests}\n\nهل أنت متأكد من النشر/التحديث؟`)) return;
+            if (!confirm(`أنت على وشك نشر الزيارة.\n\nجاهز: ${completedTests}\nقيد التشغيل: ${pendingTests}\n\nهل أنت متأكد؟`)) return;
             try {
                 const { error } = await _supabase.from('visits').update({
-                    is_published: true,
-                    published_at: new Date().toISOString()
+                    is_published: true, published_at: new Date().toISOString()
                 }).eq('visit_id', selectedVisitId).eq('tenant_id', TEBA_CONFIG.tenant.id);
                 if (error) throw error;
                 visitObj.is_published = true;
-                visitObj.published_at = new Date().toISOString();
                 selectPatient(selectedVisitId); 
-                showToast(`✅ تم النشر (${completedTests} جاهز، ${pendingTests} قيد التشغيل)`);
-            } catch (err) {
-                alert('خطأ أثناء النشر: ' + err.message);
-            }
+                showToast(`✅ تم النشر`);
+            } catch (err) { alert('خطأ: ' + err.message); }
         }
 
         async function deleteVisitTest(visitTestId, visitId) {
-            if(!confirm('هل أنت متأكد من حذف هذا التحليل نهائياً من الطلب؟')) return;
+            if(!confirm('حذف هذا التحليل نهائياً؟')) return;
             try {
                 await _supabase.from('test_results').delete().eq('visit_test_id', visitTestId).eq('tenant_id', TEBA_CONFIG.tenant.id);
                 await _supabase.from('visit_tests').delete().eq('id', visitTestId).eq('tenant_id', TEBA_CONFIG.tenant.id);
@@ -783,13 +779,13 @@
                 const vtIndex = visitTests.findIndex(v => v.id === visitTestId);
                 if(vtIndex > -1) visitTests.splice(vtIndex, 1);
                 selectPatient(visitId);
-                showToast('🗑️ تم حذف التحليل');
+                showToast('🗑️ تم الحذف');
             } catch (err) { alert('خطأ: ' + err.message); }
         }
 
-        // ==== إضافة تحليل جديد للمريض ====
+        // ==== إضافة تحليل ====
         function openAddTestModal() {
-            if(!selectedVisitId) return alert('اختر مريضاً أولاً!');
+            if(!selectedVisitId) return alert('اختر مريضاً!');
             document.getElementById('addTestModal').style.display = 'flex';
             document.getElementById('addTestSearch').value = '';
             filterAddTest();
@@ -802,7 +798,7 @@
             const currentTestCodes = visitTests.filter(vt => vt.visit_id === selectedVisitId).map(vt => vt.test_code);
             const available = filtered.filter(t => !currentTestCodes.includes(t.code));
             if(available.length === 0) {
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">لا توجد تحاليل مطابقة أو متاحة للإضافة</div>';
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">لا توجد تحاليل متاحة</div>';
                 return;
             }
             container.innerHTML = available.map(t => `
@@ -816,17 +812,14 @@
             if(!selectedVisitId) return;
             try {
                 const { error } = await _supabase.from('visit_tests').insert([{ 
-                    tenant_id: TEBA_CONFIG.tenant.id,
-                    visit_id: selectedVisitId, 
-                    test_code: code, 
-                    price_at_time: 0 
+                    tenant_id: TEBA_CONFIG.tenant.id, visit_id: selectedVisitId, test_code: code, price_at_time: 0 
                 }]);
                 if(error) throw error;
                 await loadData(); 
                 selectPatient(selectedVisitId);
                 document.getElementById('addTestModal').style.display = 'none';
-                showToast(`✅ تم إضافة ${name} بنجاح`);
-            } catch(err) { alert('خطأ في الإضافة: ' + err.message); }
+                showToast(`✅ تم إضافة ${name}`);
+            } catch(err) { alert('خطأ: ' + err.message); }
         }
 
         // ==== الطباعة ====
@@ -834,18 +827,22 @@
             let ageStr = visit.patient.age + ' Years';
             if(visit.patient.age_type === 'Months') ageStr = visit.patient.age + ' Months';
             if(visit.patient.age_type === 'Days') ageStr = visit.patient.age + ' Days';
+            
+            // اللوجو هنا في الـ print-header
             return `
                 <div class="print-header">
-                    <div style="width: 50%; text-align: left;">
-                        <h1 style="margin: 0; color: #000; font-size: 28px; font-weight: 900; letter-spacing: 1px;">${TEBA_CONFIG.lab.nameEn}</h1>
-                        <p style="margin: 4px 0 0 0; font-size: 15px; font-weight: 600; color: #000;">For Medical Analyzes</p>
+                    <div style="width: 50%; text-align: left; padding-left: 15px;">
+                        <h1 style="margin: 0; color: #000; font-size: 26px; font-weight: 900; letter-spacing: 1px;">${TEBA_CONFIG.lab.nameEn}</h1>
+                        <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 600; color: #000;">For Medical Analyzes</p>
                         <p style="margin: 2px 0 0 0; font-size: 14px; color: #333;">${TEBA_CONFIG.lab.doctor}</p>
                     </div>
-                    <div style="width: 50%; display: flex; justify-content: flex-end;">
-                        <img src="../header.png" alt="Logo" style="max-height: 90px; object-fit: contain;" onerror="this.style.display='none'">
+                    <div style="width: 50%; display: flex; justify-content: flex-end; padding-right: 15px;">
+                        <img src="../header.png" alt="Logo" style="max-height: 70px; object-fit: contain;">
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; border: 1.5px solid #000; padding: 10px 15px; border-radius: 4px; background: #fff; font-size: 13px; margin-bottom: 20px; z-index: 2; position: relative;">
+                
+                <!-- معلومات المريض -->
+                <div style="display: flex; justify-content: space-between; border: 1.5px solid #000; padding: 10px 15px; border-radius: 4px; background: #fff; font-size: 13px; margin-bottom: 15px; position: relative;">
                     <div style="width: 50%; display: flex; flex-direction: column; gap: 5px;">
                         <div><strong style="color: #000; display: inline-block; width: 100px;">Patient:</strong> <span style="font-weight: bold;">${visit.patient.name || 'Unknown'}</span></div>
                         <div><strong style="color: #000; display: inline-block; width: 100px;">Age/Gender:</strong> <span style="font-weight: bold;">${ageStr} / ${visit.patient.gender}</span></div>
@@ -861,14 +858,16 @@
         }
 
         function getFooterHtml() {
+            // الفوتر هنا فيه العناوين كاملة زي الصورة اللي إنت بعتها
             return `
-                <div class="print-footer" style="margin-top: auto;">
-                    <div style="width: 40%; text-align: left; direction: ltr;">
-                        <p style="margin: 4px 0; font-weight: bold; font-size: 13px; color: #000;">Tel: ${TEBA_CONFIG.lab.phone}</p>
-                        <p style="margin: 4px 0; font-weight: bold; font-size: 13px; color: #000;">WhatsApp: ${TEBA_CONFIG.lab.whatsapp}</p>
+                <div class="print-footer">
+                    <div style="width: 40%; text-align: left; direction: ltr; padding-left: 15px;">
+                        <p style="margin: 4px 0; font-weight: bold; font-size: 12px; color: #000;">Tel: ${TEBA_CONFIG.lab.phone}</p>
+                        <p style="margin: 4px 0; font-weight: bold; font-size: 12px; color: #000;">WhatsApp: ${TEBA_CONFIG.lab.whatsapp}</p>
                     </div>
-                    <div style="width: 60%; text-align: right; direction: rtl; color: #000; font-weight: bold; font-size: 12px;">
-                        <p style="margin: 4px 0;">${TEBA_CONFIG.lab.address}</p>
+                    <div style="width: 60%; text-align: right; direction: rtl; color: #000; font-weight: bold; font-size: 11px; line-height: 1.5; padding-right: 15px;">
+                        <p style="margin: 2px 0;">الفرع الأول: الجعافرة - الطريق العمومي - أعلى صيدلية الصحابة</p>
+                        <p style="margin: 2px 0;">الفرع الثاني: بهتيم - مساكن اسكو - أمام مدرسة ابن الخطاب - عيادة د. محمد رمضان</p>
                     </div>
                 </div>
             `;
@@ -946,24 +945,20 @@
             });
             if (singlesRows !== '' || profilesData.length === 0) {
                 let pageHtml = `<div class="print-page">`;
-                pageHtml += `<div>`;
                 pageHtml += getHeaderHtml(visit, reqDate, printDate);
                 if (singlesRows !== '') {
                     pageHtml += `<div style="margin-bottom: 25px;"><h3 style="margin: 0 0 10px 0; background: #eee; padding: 8px 12px; border-left: 4px solid #000; font-size: 15px; text-transform: uppercase; color: #000;">SINGLE TESTS</h3><table style="width: 100%; border-collapse: collapse; font-size: 13px;"><thead><tr style="background: #000; color: #fff;"><th style="padding: 8px 6px; text-align:left;">Test Name</th><th style="padding: 8px 6px; text-align:center;">Result</th><th style="padding: 8px 6px; text-align:center;">State</th><th style="padding: 8px 6px; text-align:center;">Unit</th><th style="padding: 8px 6px; text-align:center;">Ref. Range</th></tr></thead><tbody>${singlesRows}</tbody></table></div>`;
                 } else {
                     pageHtml += `<p style="text-align:center; font-weight:bold; margin-top:50px;">No results recorded for this visit.</p>`;
                 }
-                pageHtml += `</div>`;
                 pageHtml += getFooterHtml();
                 pageHtml += `</div>`;
                 printArea.innerHTML += pageHtml;
             }
             profilesData.forEach(profile => {
                 let pageHtml = `<div class="print-page">`;
-                pageHtml += `<div>`;
                 pageHtml += getHeaderHtml(visit, reqDate, printDate);
                 pageHtml += `<div style="margin-bottom: 25px;"><h3 style="margin: 0 0 10px 0; background: #eee; padding: 8px 12px; border-left: 4px solid #000; font-size: 15px; text-transform: uppercase; color: #000;">${profile.name}</h3><table style="width: 100%; border-collapse: collapse; font-size: 13px;"><thead><tr style="background: #000; color: #fff;"><th style="padding: 8px 6px; text-align:left;">Test Name</th><th style="padding: 8px 6px; text-align:center;">Result</th><th style="padding: 8px 6px; text-align:center;">State</th><th style="padding: 8px 6px; text-align:center;">Unit</th><th style="padding: 8px 6px; text-align:center;">Ref. Range</th></tr></thead><tbody>${profile.rows}</tbody></table></div>`;
-                pageHtml += `</div>`;
                 pageHtml += getFooterHtml();
                 pageHtml += `</div>`;
                 printArea.innerHTML += pageHtml;
@@ -976,12 +971,11 @@
             await loadData(); 
             if (await db.offline_results.count() > 0) {
                 document.getElementById('syncBtn').style.display = 'flex';
-                showToast('⚠️ يوجد نتائج محفوظة محلياً لم تتم مزامنتها بعد.', true);
+                showToast('⚠️ يوجد نتائج محفوظة محلياً.', true);
             }
         };
     </script>
 
-    <!-- سكريبت تفعيل الـ PWA -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
