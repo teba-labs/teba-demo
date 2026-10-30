@@ -9,13 +9,11 @@
     <link rel="manifest" href="../manifest.json">
     <meta name="theme-color" content="#0a6847">
 
-    <!-- الخط الموحد -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap" rel="stylesheet">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- مكتبة Dexie للأوفلاين -->
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="../config.js"></script>
     <style>
@@ -89,58 +87,24 @@
         .btn-print-modal { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1rem; margin-top: 15px; }
         .btn-print-modal:hover { background: var(--primary-hover); }
 
-        /* ==========================================
-           Print Styles (Fixed Header & Footer)
-           ========================================== */
-        .print-page { 
-            background: #fff; 
-            width: 100%; 
-            margin-bottom: 20px; 
-            position: relative; 
-        }
+        /* Print Styles */
+        .print-page { background: #fff; width: 100%; margin-bottom: 20px; position: relative; }
         
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
             #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
-
-            /* مساحات ورق A4 عشان الهيدر والفوتر ياخدوا مكانهم */
             @page { size: A4; margin: 40mm 15mm 35mm 15mm; }
 
-            .print-header {
-                position: fixed;
-                top: -32mm;
-                left: 0;
-                width: 100%;
-                height: 28mm;
-                background: #fff;
-                border-bottom: 2px solid #000;
-                padding-bottom: 5px;
-                z-index: 1000;
-            }
-            
-            .print-footer {
-                position: fixed;
-                bottom: -28mm;
-                left: 0;
-                width: 100%;
-                height: 22mm;
-                background: #fff;
-                border-top: 2px solid #000;
-                padding-top: 8px;
-                z-index: 1000;
-            }
+            .print-header { position: fixed; top: -32mm; left: 0; width: 100%; height: 28mm; background: #fff; border-bottom: 2px solid #000; padding-bottom: 5px; z-index: 1000; }
+            .print-footer { position: fixed; bottom: -28mm; left: 0; width: 100%; height: 22mm; background: #fff; border-top: 2px solid #000; padding-top: 8px; z-index: 1000; }
 
-            .print-page { 
-                border: none; box-shadow: none; margin: 0; padding: 0; 
-                page-break-after: always; 
-            }
+            .print-page { border: none; box-shadow: none; margin: 0; padding: 0; page-break-after: always; }
             .print-page:last-child { page-break-after: auto; }
             
             .modal { position: absolute; background: transparent; display: block !important; padding: 0;}
             .modal-content { box-shadow: none; padding: 0; border: none; max-height: none; overflow: visible; }
             .btn-print-modal, .btn-close { display: none !important; }
-            
             .print-header img { filter: contrast(1.5) brightness(0.8); }
         }
 
@@ -221,8 +185,9 @@
             <div id="print-area" style="direction: ltr; text-align: left; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #000;"></div>
             <button class="btn-print-modal" onclick="window.print()">🖨️ Print Now</button>
         </div>
-    </div>    <script>
-        // ==== التحقق من تسجيل الدخول (ديناميكي) ====
+    </div>
+
+    <script>
         if (!localStorage.getItem('teba_tenant_id')) {
             window.location.href = 'home.html';
         }
@@ -234,12 +199,10 @@
             }
         });
 
-        // ==== تهيئة السحابة ====
         const supabaseUrl = TEBA_CONFIG.supabase.url;
         const supabaseKey = TEBA_CONFIG.supabase.key;
         const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-        // ==== تهيئة الداتابيز المحلية (Dexie للأوفلاين) ====
         const db = new Dexie('TebaLabOfflineDB');
         db.version(1).stores({
             offline_results: '++id, visitTestId, visitId, resultsData, timestamp' 
@@ -248,7 +211,6 @@
         let allVisits = [], visitTests = [], testsCatalog = [], testResults = [];
         let selectedVisitId = null;
 
-        // ==== دوال مساعدة ====
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             t.innerText = msg; 
@@ -271,12 +233,10 @@
             }
         });
 
-        // ==== دالة الرينجات الديناميكية الذكية ====
         function getSmartRange(param, patient, selectedPhase = null) {
             let rawRange = patient.gender === 'female' ? param.ref_female : param.ref_male;
             if (!rawRange || rawRange === '-' || rawRange === 'N/A') rawRange = param.reference_range || '-';
             
-            // التعامل مع الرينجات المعقدة (المقسمة للكبار والأطفال)
             if (rawRange.includes('Adult:') || rawRange.includes('Child:') || rawRange.includes('Infant:') || rawRange.includes('Newborn:')) {
                 let ageInYears = parseFloat(patient.age) || 0;
                 if (patient.age_type === 'Months') ageInYears = ageInYears / 12;
@@ -295,7 +255,6 @@
                 }
             }
             
-            // التعامل مع رينجات الإناث (Phases)
             if (selectedPhase && rawRange.includes(selectedPhase)) {
                 let parts = rawRange.split('|').map(p => p.trim());
                 let match = parts.find(p => p.toLowerCase().startsWith(selectedPhase.toLowerCase()));
@@ -333,7 +292,6 @@
             if (rangeLabel) rangeLabel.innerText = newRange;
         };
 
-        // ==== جلب البيانات (بفلتر المعمل الحالي) ====
         async function loadData() {
             const { data: visits } = await _supabase.from('visits').select('*').eq('tenant_id', TEBA_CONFIG.tenant.id).order('visit_id', { ascending: false }).limit(100);
             if (!visits || visits.length === 0) return renderPatients();
@@ -380,9 +338,7 @@
                     <div class="p-meta"><span>زيارة #${v.visit_id}</span><span>${v.patient.gender === 'male' ? 'ذكر' : 'أنثى'} • ${ageStr}</span></div>
                 </div>
             `}).join('');
-        }
-
-        function getSmartParams(catalogItem) {
+        }        function getSmartParams(catalogItem) {
             let params = catalogItem.parameters ? JSON.parse(JSON.stringify(catalogItem.parameters)) : [];
             const isLipid = (catalogItem.name && catalogItem.name.toUpperCase().includes('LIPID')) || catalogItem.code === '109';
             if (isLipid) {
@@ -403,7 +359,6 @@
             crystalsSelect.innerHTML = '<option value="">-- اختر --</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
         }
 
-        // ==== عرض بيانات المريض والتحاليل ====
         function selectPatient(visitId) {
             selectedVisitId = visitId;
             renderPatients();
@@ -514,7 +469,8 @@
                 const firstInput = document.querySelector('.test-item input:not([readonly]), .test-item select');
                 if(firstInput) firstInput.focus();
             }, 100);
-        }        // ==== التنقل بالكيبورد ====
+        }
+
         function handleEnter(e, el, vtId, isProfile) {
             let form = el.closest('.test-body');
             let inputs = Array.from(form.querySelectorAll('input:not([readonly]), select'));
@@ -550,7 +506,6 @@
             }
         }
 
-        // ==== الحسابات التلقائية ====
         function triggerCalc(visitTestId, testCode) {
             const catalogItem = testsCatalog.find(c => c.code === testCode);
             if (!catalogItem) return;
@@ -602,7 +557,6 @@
             });
         }
 
-        // ==== حفظ النتائج (Offline-First) ====
         async function saveTestResult(visitTestId, isProfile, isSilent = false) {
             const vt = visitTests.find(v => v.id === visitTestId);
             const catalogItem = testsCatalog.find(c => c.code === vt.test_code) || { code: vt.test_code, parameters: [] };
@@ -630,7 +584,6 @@
                 return;
             }
 
-            // 1. لو مفيش نت -> حفظ محلي
             if (!navigator.onLine) {
                 await db.offline_results.put({
                     visitTestId: visitTestId,
@@ -646,7 +599,6 @@
                 return;
             }
 
-            // 2. لو فيه نت -> حفظ في السحابة
             const { error } = await _supabase.from('test_results').upsert({
                 tenant_id: TEBA_CONFIG.tenant.id,
                 visit_test_id: visitTestId,
@@ -663,7 +615,6 @@
             else showToast('💾 تم الحفظ تلقائياً');
         }
 
-        // ==== الإضافة السريعة للباراميتر ====
         function openQuickAddModal(vtId, testCode) {
             document.getElementById('qaVisitTestId').value = vtId;
             document.getElementById('qaTestCode').value = testCode;
@@ -687,7 +638,6 @@
             btn.innerText = '⏳...'; btn.disabled = true;
 
             try {
-                // 1. تحديث الكتالوج عشان الباراميتر يظهر لكل المرضى الجايين
                 const catalogItem = testsCatalog.find(c => c.code === testCode);
                 if (catalogItem) {
                     let currentParams = catalogItem.parameters || [];
@@ -703,18 +653,16 @@
                     }
                 }
 
-                // 2. حفظ النتيجة للمريض الحالي
                 const result = testResults.find(r => r.visit_test_id == vtId);
                 let resultsData = result ? result.results_data : {};
                 resultsData[paramName] = { value: paramValue };
 
                 await _supabase.from('test_results').upsert({
-                    tenant_id: TEBA_CONFIG.tenant.id,
+                    tenant_id: TEBA_CONFIG.tenant_id,
                     visit_test_id: vtId,
                     results_data: resultsData
                 }, { onConflict: 'visit_test_id' });
 
-                // 3. إعادة رسم الكروت عشان الباراميتر الجديد يظهر
                 document.getElementById('quickAddModal').style.display = 'none';
                 await loadData(); 
                 selectPatient(selectedVisitId);
@@ -727,7 +675,6 @@
             }
         }
 
-        // ==== مزامنة البيانات المحفوظة أوفلاين ====
         async function syncOfflineData() {
             const pending = await db.offline_results.toArray();
             if (pending.length === 0) {
@@ -764,7 +711,6 @@
             if (selectedVisitId) selectPatient(selectedVisitId);
         }
 
-        // ==== النشر والحذف ====
         async function publishVisit() {
             if (!selectedVisitId) return;
             const visitObj = allVisits.find(v => v.visit_id === selectedVisitId);
@@ -806,7 +752,6 @@
             } catch (err) { alert('خطأ: ' + err.message); }
         }
 
-        // ==== إضافة تحليل جديد للمريض ====
         function openAddTestModal() {
             if(!selectedVisitId) return alert('اختر مريضاً أولاً!');
             document.getElementById('addTestModal').style.display = 'flex';
@@ -846,22 +791,29 @@
                 document.getElementById('addTestModal').style.display = 'none';
                 showToast(`✅ تم إضافة ${name} بنجاح`);
             } catch(err) { alert('خطأ في الإضافة: ' + err.message); }
-        }        // ==== الطباعة ====
+        }
+
         function getHeaderHtml(visit, reqDate, printDate) {
             let ageStr = visit.patient.age + ' Years';
             if(visit.patient.age_type === 'Months') ageStr = visit.patient.age + ' Months';
             if(visit.patient.age_type === 'Days') ageStr = visit.patient.age + ' Days';
             return `
-                <div class="print-header">
-                    <div style="width: 50%; text-align: left;">
+                <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; z-index: 2; position: relative; direction: ltr;">
+                    
+                    <!-- الشمال: بيانات المعمل -->
+                    <div style="width: 50%; text-align: left; direction: ltr;">
                         <h1 style="margin: 0; color: #000; font-size: 28px; font-weight: 900; letter-spacing: 1px;">${TEBA_CONFIG.lab.nameEn}</h1>
                         <p style="margin: 4px 0 0 0; font-size: 15px; font-weight: 600; color: #000;">For Medical Analyzes</p>
-                        <p style="margin: 2px 0 0 0; font-size: 14px; color: #333;">${TEBA_CONFIG.lab.doctor}</p>
+                        <p style="margin: 2px 0 0 0; font-size: 14px; color: #333; direction: rtl;">${TEBA_CONFIG.lab.doctor}</p>
                     </div>
+
+                    <!-- اليمين: اللوجو -->
                     <div style="width: 50%; display: flex; justify-content: flex-end;">
-                        <img src="../header.png" alt="Logo" style="max-height: 90px; object-fit: contain;" onerror="this.style.display='none'">
+                        <img src="../header.png" alt="Logo" style="max-height: 110px; object-fit: contain; filter: contrast(1.5) brightness(0.8);" onerror="this.style.display='none'">
                     </div>
+
                 </div>
+                
                 <div style="display: flex; justify-content: space-between; border: 1.5px solid #000; padding: 10px 15px; border-radius: 4px; background: #fff; font-size: 13px; margin-bottom: 20px; z-index: 2; position: relative;">
                     <div style="width: 50%; display: flex; flex-direction: column; gap: 5px;">
                         <div><strong style="color: #000; display: inline-block; width: 100px;">Patient:</strong> <span style="font-weight: bold;">${visit.patient.name || 'Unknown'}</span></div>
@@ -878,7 +830,6 @@
         }
 
         function getFooterHtml() {
-            // التعديل الجديد: العناوين يمين، والأرقام شمال، والأيقونات
             return `
                 <div class="print-footer" style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; width: 100%; border-top: 2px solid #000; padding-top: 10px; font-size: 13px; color: #000;">
                     
@@ -970,7 +921,7 @@
                 }
             });
 
-            let htmlContent = getHeaderHtml(visit, reqDate, printDate); // الهيدر الثابت
+            let htmlContent = getHeaderHtml(visit, reqDate, printDate);
 
             if (singlesRows !== '' || profilesData.length === 0) {
                 let pageHtml = `<div class="print-page">`;
@@ -994,13 +945,12 @@
                 htmlContent += pageHtml;
             });
 
-            htmlContent += getFooterHtml(); // الفوتر الثابت
+            htmlContent += getFooterHtml();
 
             printArea.innerHTML = htmlContent;
             document.getElementById('printModal').style.display = 'flex';
         }
 
-        // ==== التشغيل ====
         window.onload = async () => { 
             await loadData(); 
             if (await db.offline_results.count() > 0) {
@@ -1010,7 +960,6 @@
         };
     </script>
 
-    <!-- سكريبت تفعيل الـ PWA -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
