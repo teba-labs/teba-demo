@@ -3,78 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>المعمل الذكي</title>
+    <title>المعمل الذكي | معامل طيبة</title>
+    
+    <!-- PWA Tags -->
+    <link rel="manifest" href="../manifest.json">
+    <meta name="theme-color" content="#0a6847">
+
+    <!-- الخط الموحد -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap" rel="stylesheet">
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
+    <!-- مكتبة Dexie للأوفلاين -->
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="../config.js"></script>
     <style>
         :root {
-            --primary-bg: #f4f7f6; --surface-bg: #ffffff; --primary-color: #0a6847;
-            --accent-color: #3498db; --success-color: #2ecc71; --danger-color: #e74c3c;
-            --warning-color: #f39c12; --text-main: #333; --text-muted: #7f8c8d; 
-            --border-color: #dcdde1; --radius: 8px; 
-            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --bg: #f4f7f6; --surface: #ffffff; --surface-hover: #f8fafc;
+            --primary: #0a6847; --primary-hover: #085a3d; --primary-light: #10b981;
+            --accent: #3498db; --gold: #d4a843; --danger: #e74c3c; --warning: #f39c12;
+            --text: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+            --font: 'Almarai', sans-serif; --radius: 12px;
+            --shadow: 0 4px 20px rgba(0,0,0,0.04);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font-family); background-color: var(--primary-bg); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { font-family: var(--font); background-color: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* الهيدر */
+        header { background: var(--surface); color: var(--text); display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); z-index: 10; border-bottom: 3px solid var(--primary); }
+        .brand-info { font-weight: 800; font-size: 1.2rem; color: var(--primary); display: flex; align-items: center; gap: 10px;}
         
-        /* الهيدر والأزرار */
-        header { background-color: var(--surface-bg); color: var(--text-main); display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 10; border-bottom: 3px solid var(--primary-color); }
-        .brand-info { font-weight: 800; font-size: 1.2rem; color: var(--primary-color); display: flex; align-items: center; gap: 10px;}
-        
-        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
         .nav-btn { 
             border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; 
             font-weight: bold; font-family: inherit; font-size: 0.9rem; 
             display: flex; align-items: center; gap: 6px; transition: 0.2s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: white;
         }
-        .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         
-        /* ألوان مميزة لكل زرار */
         .btn-home { background: #64748b; }
         .btn-publish { background: #8e44ad; }
-        .btn-add { background: #2ecc71; }
-        .btn-print { background: #f39c12; }
+        .btn-add { background: var(--primary-light); }
+        .btn-print { background: var(--warning); }
+        .btn-sync { background: var(--gold); display: none; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-        .main-grid { display: grid; grid-template-columns: 300px 1fr 1fr; gap: 15px; padding: 15px; flex-grow: 1; height: calc(100vh - 70px); }
-        .panel { background: var(--surface-bg); border-radius: var(--radius); box-shadow: 0 2px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; border: 1px solid var(--border-color); overflow: hidden; }
-        .panel-header { background: #f8f9fa; padding: 15px; border-bottom: 1px solid var(--border-color); font-weight: bold; color: var(--primary-color); text-align: center; font-size: 1.1rem;}
+        /* التخطيط */
+        .main-grid { display: grid; grid-template-columns: 300px 1fr 1fr; gap: 15px; padding: 15px; flex-grow: 1; height: calc(100vh - 70px); overflow: hidden; }
+        .panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; border: 1px solid var(--border); overflow: hidden; }
+        .panel-header { background: var(--surface-hover); padding: 15px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--primary); text-align: center; font-size: 1.1rem;}
 
         .patient-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
-        .patient-card { padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; background: white; position: relative;}
-        .patient-card:hover { border-color: var(--accent-color); background: #f0f8ff; }
-        .patient-card.active { border-color: var(--accent-color); background: #e1f0fa; border-right: 4px solid var(--accent-color); }
-        .p-name { font-weight: bold; margin-bottom: 5px; color: var(--primary-color);}
+        .patient-card { padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; background: var(--surface); position: relative;}
+        .patient-card:hover { border-color: var(--primary); background: var(--surface-hover); }
+        .patient-card.active { border-color: var(--primary); background: #f0fdf4; border-right: 4px solid var(--primary); }
+        .p-name { font-weight: bold; margin-bottom: 5px; color: var(--primary);}
         .p-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between;}
-        .badge-published { background: var(--success-color); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; position: absolute; top: 10px; left: 10px;}
+        .badge-published { background: var(--primary-light); color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; position: absolute; top: 10px; left: 10px;}
 
         .tests-list { flex-grow: 1; overflow-y: auto; padding: 15px; }
-        .test-item { border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
-        .test-header { background: #f8f9fa; padding: 10px 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
+        .test-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 15px; overflow: hidden; background: var(--surface); box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
+        .test-header { background: var(--surface-hover); padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         .test-body { padding: 15px; }
         
-        .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
         .input-group label { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;}
-        .range-info { font-weight: normal; font-size: 0.75rem; color: var(--accent-color); background: #eaf4fc; padding: 2px 6px; border-radius: 4px; max-width: 60%; text-align: left; line-height: 1.3;}
-        .input-group input, .input-group select { padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; font-family: inherit; outline: none; text-align: center; font-weight: bold; background: white;}
-        .input-group input:focus, .input-group select:focus { border-color: var(--accent-color); box-shadow: 0 0 5px rgba(52,152,219,0.3); }
-        .input-calc { background-color: #f0f8ff; color: #0056b3; border-color: #b3d7ff;}
+        .range-info { font-weight: normal; font-size: 0.75rem; color: var(--primary); background: #f0fdf4; padding: 2px 6px; border-radius: 4px; max-width: 60%; text-align: left; line-height: 1.3;}
+        .input-group input, .input-group select { padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; font-family: inherit; outline: none; text-align: center; font-weight: bold; background: var(--surface); color: var(--text);}
+        .input-group input:focus, .input-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(10, 104, 71, 0.1); }
+        .input-calc { background-color: #f0fdf4; color: var(--primary); border-color: #bbf7d0;}
         
-        .phase-selector { margin-bottom: 8px; padding: 5px; border-radius: 4px; border: 1px solid var(--warning-color); background: #fff9e6; font-size: 0.85rem; font-weight: bold; color: #b9770e; width: 100%; text-align: center;}
+        .phase-selector { margin-bottom: 8px; padding: 8px; border-radius: 4px; border: 1px solid var(--warning); background: #fffbeb; font-size: 0.85rem; font-weight: bold; color: #b45309; width: 100%; text-align: center;}
 
-        .btn-group { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-        .btn-save-test { flex-grow: 1; padding: 10px; background: var(--success-color); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: inherit;}
-        .btn-del-test { background: var(--danger-color); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: inherit;}
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .btn-save-test { flex-grow: 1; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s;}
+        .btn-save-test:hover { background: var(--primary-hover); }
+        .btn-quick-add { padding: 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s;}
+        .btn-quick-add:hover { background: #7c3aed; }
+        .btn-del-test { background: rgba(220, 38, 38, 0.1); color: var(--danger); border: 1px solid #fecaca; padding: 12px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s;}
+        .btn-del-test:hover { background: var(--danger); color: white;}
         
         .empty-msg { text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 1.1rem; }
 
-        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--success-color); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2); display: none; z-index: 1000; }
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--primary); color: white; padding: 15px 30px; border-radius: 30px; font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: none; z-index: 1000; }
+        #toast.error { background: var(--danger); }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 95%; max-width: 900px; max-height: 95vh; overflow-y: auto; }
+        /* المودالز */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(3px); padding: 10px;}
+        .modal-content { background: var(--surface); padding: 25px; border-radius: 12px; width: 100%; max-width: 900px; max-height: 95vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
         
-        .btn-print-modal { background: var(--success-color); color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1rem; margin-top: 15px; }
+        .btn-print-modal { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1rem; margin-top: 15px; }
+        .btn-print-modal:hover { background: var(--primary-hover); }
 
+        /* تنسيقات الطباعة */
         .print-page { background: #fff; width: 100%; min-height: 297mm; padding: 15mm; margin-bottom: 20px; box-sizing: border-box; position: relative; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; }
         .print-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; z-index: 2; position: relative; }
         .print-footer { position: static; width: 100%; border-top: 2px solid #000; padding-top: 10px; font-size: 12px; display: flex; justify-content: space-between; margin-top: auto; }
@@ -83,11 +106,29 @@
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
             #print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0;}
-            .modal { position: absolute; background: transparent; display: block !important; }
+            .modal { position: absolute; background: transparent; display: block !important; padding: 0;}
             .modal-content { box-shadow: none; padding: 0; border: none; max-height: none; overflow: visible; }
             .btn-print-modal, .btn-close { display: none !important; }
             .print-page { border: none; box-shadow: none; margin: 0; page-break-after: always; min-height: 100vh; }
             @page { size: A4; margin: 0; }
+        }
+
+        /* ==========================================
+           Responsive Design (Mobile & Tablet)
+           ========================================== */
+        @media (max-width: 1024px) {
+            body { overflow-y: auto; height: auto; }
+            .main-grid { 
+                grid-template-columns: 1fr; 
+                height: auto; 
+                overflow: visible;
+                padding-bottom: 50px;
+            }
+            /* إعطاء ارتفاع ثابت للبانل على الموبايل عشان تبقى مريحة */
+            .panel { min-height: 350px; max-height: 450px; }
+            header { flex-direction: column; gap: 10px; padding: 15px; text-align: center; }
+            .header-actions { justify-content: center; }
+            .nav-btn { font-size: 0.75rem; padding: 8px 10px; }
         }
     </style>
 </head>
@@ -96,6 +137,7 @@
     <header>
         <div class="brand-info" id="brandInfo">🔬 المعمل - جاري التحميل...</div>
         <div class="header-actions">
+            <button class="nav-btn btn-sync" id="syncBtn" onclick="syncOfflineData()">🔄 مزامنة</button>
             <button class="nav-btn btn-home" onclick="window.location.href='home.html'">🏠 الرئيسية</button>
             <button class="nav-btn btn-publish" id="btnPublishVisit" onclick="publishVisit()" style="display:none;">🌐 نشر النتائج</button>
             <button class="nav-btn btn-add" id="btnAddTest" onclick="openAddTestModal()" style="display:none;">➕ إضافة تحليل</button>
@@ -120,23 +162,49 @@
         </div>
     </div>
 
+    <!-- مودال إضافة تحليل للمريض -->
     <div class="modal" id="addTestModal">
         <div class="modal-content" style="max-width: 700px;">
-            <h3 style="margin-bottom: 15px;">➕ إضافة تحليل جديد للحالة</h3>
-            <input type="text" id="addTestSearch" placeholder="ابحث عن التحليل بالكود أو الاسم..." onkeyup="filterAddTest()" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 2px solid var(--accent-color); border-radius: 6px; outline: none;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">➕ إضافة تحليل جديد للحالة</h3>
+            <input type="text" id="addTestSearch" placeholder="ابحث عن التحليل بالكود أو الاسم..." onkeyup="filterAddTest()" style="width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; outline: none; font-family: inherit;">
             <div id="addTestResults" style="max-height: 400px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"></div>
         </div>
     </div>
 
-    <div class="modal" id="printModal">
-        <div class="modal-content" style="background: #e0e0e0;">
-            <div id="print-area" style="direction: ltr; text-align: left; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #000;"></div>
-            <button class="btn-print-modal" onclick="window.print()">🖨️ Print Now</button>
+    <!-- مودال الإضافة السريعة للباراميتر -->
+    <div class="modal" id="quickAddModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <h3 style="margin-bottom: 15px; color: #8b5cf6;">➕ إضافة باراميتر سريع</h3>
+            <input type="hidden" id="qaVisitTestId">
+            <input type="hidden" id="qaTestCode">
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight:bold; font-size:0.9rem; color:var(--text-muted);">اسم الباراميتر</label>
+                <input type="text" id="qaParamName" placeholder="مثال: Crystals" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-top:5px; font-family: inherit;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight:bold; font-size:0.9rem; color:var(--text-muted);">النتيجة</label>
+                <input type="text" id="qaParamValue" placeholder="مثال: Uric Acid" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-top:5px; font-family: inherit;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight:bold; font-size:0.9rem; color:var(--text-muted);">الوحدة (Unit) - اختياري</label>
+                <input type="text" id="qaParamUnit" placeholder="مثال: mg/dL" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-top:5px; font-family: inherit;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-save-test" style="background:#8b5cf6;" onclick="saveQuickAddParam()">💾 حفظ وإضافة</button>
+                <button class="btn-del-test" onclick="document.getElementById('quickAddModal').style.display='none'">إلغاء</button>
+            </div>
         </div>
     </div>
 
-    <script>
-        if (sessionStorage.getItem('emp_logged') !== 'yes') {
+    <!-- مودال الطباعة -->
+    <div class="modal" id="printModal">
+        <div class="modal-content" style="background: #e0e0e0; max-width: 1000px;">
+            <div id="print-area" style="direction: ltr; text-align: left; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #000;"></div>
+            <button class="btn-print-modal" onclick="window.print()">🖨️ Print Now</button>
+        </div>
+    </div>    <script>
+        // ==== التحقق من تسجيل الدخول (ديناميكي) ====
+        if (!localStorage.getItem('teba_tenant_id')) {
             window.location.href = 'home.html';
         }
 
@@ -147,18 +215,27 @@
             }
         });
 
+        // ==== تهيئة السحابة ====
         const supabaseUrl = TEBA_CONFIG.supabase.url;
         const supabaseKey = TEBA_CONFIG.supabase.key;
         const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
+        // ==== تهيئة الداتابيز المحلية (Dexie للأوفلاين) ====
+        const db = new Dexie('TebaLabOfflineDB');
+        db.version(1).stores({
+            offline_results: '++id, visitTestId, visitId, resultsData, timestamp' 
+        });
+
         let allVisits = [], visitTests = [], testsCatalog = [], testResults = [];
         let selectedVisitId = null;
 
-        function showToast(msg) {
+        // ==== دوال مساعدة ====
+        function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
-            t.innerText = msg;
+            t.innerText = msg; 
+            t.className = isError ? 'error' : '';
             t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+            setTimeout(() => t.style.display = 'none', 4000);
         }
 
         document.addEventListener("wheel", function(event){
@@ -171,16 +248,21 @@
             if (event.key === 'Escape') {
                 document.getElementById('printModal').style.display = 'none';
                 document.getElementById('addTestModal').style.display = 'none';
+                document.getElementById('quickAddModal').style.display = 'none';
             }
         });
 
+        // ==== دالة الرينجات الديناميكية الذكية ====
         function getSmartRange(param, patient, selectedPhase = null) {
             let rawRange = patient.gender === 'female' ? param.ref_female : param.ref_male;
             if (!rawRange || rawRange === '-' || rawRange === 'N/A') rawRange = param.reference_range || '-';
+            
+            // التعامل مع الرينجات المعقدة (المقسمة للكبار والأطفال)
             if (rawRange.includes('Adult:') || rawRange.includes('Child:') || rawRange.includes('Infant:') || rawRange.includes('Newborn:')) {
                 let ageInYears = parseFloat(patient.age) || 0;
                 if (patient.age_type === 'Months') ageInYears = ageInYears / 12;
                 if (patient.age_type === 'Days') ageInYears = ageInYears / 365;
+                
                 let parts = rawRange.split('|').map(p => p.trim());
                 if (ageInYears <= 1) {
                     let match = parts.find(p => p.includes('Infant:') || p.includes('Newborn:'));
@@ -193,6 +275,8 @@
                     if (match) return match.replace(/Adult:/g, '').trim();
                 }
             }
+            
+            // التعامل مع رينجات الإناث (Phases)
             if (selectedPhase && rawRange.includes(selectedPhase)) {
                 let parts = rawRange.split('|').map(p => p.trim());
                 let match = parts.find(p => p.toLowerCase().startsWith(selectedPhase.toLowerCase()));
@@ -230,11 +314,13 @@
             if (rangeLabel) rangeLabel.innerText = newRange;
         };
 
+        // ==== جلب البيانات (بفلتر المعمل الحالي) ====
         async function loadData() {
-            const { data: visits } = await _supabase.from('visits').select('*').order('visit_id', { ascending: false }).limit(100);
+            const { data: visits } = await _supabase.from('visits').select('*').eq('tenant_id', TEBA_CONFIG.tenant.id).order('visit_id', { ascending: false }).limit(100);
             if (!visits || visits.length === 0) return renderPatients();
             const visitIds = visits.map(v => v.visit_id);
             const patientIds = [...new Set(visits.map(v => v.patient_id))];
+            
             const { data: patients } = await _supabase.from('patients').select('*').in('id', patientIds);
             const { data: vt } = await _supabase.from('visit_tests').select('*').in('visit_id', visitIds);
             const vtIds = vt ? vt.map(v => v.id) : [];
@@ -243,7 +329,8 @@
                 const { data: res } = await _supabase.from('test_results').select('*').in('visit_test_id', vtIds);
                 results = res || [];
             }
-            const { data: catalog } = await _supabase.from('tests_catalog').select('*');
+            const { data: catalog } = await _supabase.from('tests_catalog').select('*').eq('tenant_id', TEBA_CONFIG.tenant.id);
+            
             testsCatalog = catalog || [];
             visitTests = vt || [];
             testResults = results || [];
@@ -297,6 +384,7 @@
             crystalsSelect.innerHTML = '<option value="">-- اختر --</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
         }
 
+        // ==== عرض بيانات المريض والتحاليل ====
         function selectPatient(visitId) {
             selectedVisitId = visitId;
             renderPatients();
@@ -304,27 +392,28 @@
             const visitObj = allVisits.find(v => v.visit_id === visitId);
             const btnPub = document.getElementById('btnPublishVisit');
             btnPub.style.display = 'block';
-            if (visitObj.is_published) {
-                btnPub.innerHTML = '🔄 تحديث النشر';
-            } else {
-                btnPub.innerHTML = '🌐 نشر الزيارة';
-            }
+            btnPub.innerHTML = visitObj.is_published ? '🔄 تحديث النشر' : '🌐 نشر الزيارة';
+            
             const singleList = document.getElementById('singleList');
             const profileList = document.getElementById('profileList');
             const vTests = visitTests.filter(vt => vt.visit_id === visitId);
+            
             if (vTests.length === 0) {
                 singleList.innerHTML = '<div class="empty-msg">لا توجد تحاليل</div>';
                 profileList.innerHTML = '<div class="empty-msg">لا توجد تحاليل</div>';
                 return;
             }
+            
             let singlesHtml = '', profilesHtml = '';
             vTests.forEach(vt => {
                 const catalogItem = testsCatalog.find(c => c.code === vt.test_code) || { name: vt.test_code, code: vt.test_code, parameters: [] };
                 const result = testResults.find(r => r.visit_test_id === vt.id);
                 const savedData = result ? result.results_data : {};
+                
                 const params = getSmartParams(catalogItem);
                 const isProfile = params.length > 1 || (params.length === 1 && params[0].name !== 'Result');
                 let inputsHtml = '';
+                
                 if (isProfile) {
                     params.forEach(param => {
                         const val = savedData[param.name]?.value || '';
@@ -336,6 +425,7 @@
                         const calcClass = isCalc ? 'input-calc' : '';
                         const placeholder = isCalc ? 'تلقائى' : '...';
                         const phaseSelectorHtml = renderPhaseSelector(vt.id, param, visitObj.patient, savedData);
+                        
                         let inputElement = '';
                         if (param.type === 'dropdown' && param.options && Array.isArray(param.options)) {
                             let optionsHtml = `<option value="">-- اختر --</option>`;
@@ -353,6 +443,7 @@
                                 oninput="triggerCalc('${vt.id}', '${vt.test_code}')"
                                 onkeydown="handleEnter(event, this, ${vt.id}, ${isProfile})">`;
                         }
+                        
                         inputsHtml += `
                             <div class="input-group">
                                 ${phaseSelectorHtml}
@@ -377,13 +468,18 @@
                         </div>
                     `;
                 }
+                
                 const cardHtml = `
                     <div class="test-item" id="card_${vt.id}">
-                        <div class="test-header"><span>${catalogItem.name}</span><span style="font-size:0.8rem; color:#666;">${vt.test_code}</span></div>
+                        <div class="test-header">
+                            <span>${catalogItem.name}</span>
+                            <span style="font-size:0.8rem; color:#666;">${vt.test_code}</span>
+                        </div>
                         <div class="test-body">
                             ${inputsHtml}
                             <div class="btn-group">
                                 <button class="btn-save-test" onclick="saveTestResult(${vt.id}, ${isProfile}, false)">💾 حفظ</button>
+                                <button class="btn-quick-add" onclick="openQuickAddModal(${vt.id}, '${vt.test_code}')">➕ إضافة باراميتر</button>
                                 <button class="btn-del-test" onclick="deleteVisitTest(${vt.id}, ${vt.visit_id})">🗑️ حذف</button>
                             </div>
                         </div>
@@ -391,14 +487,15 @@
                 `;
                 if (isProfile) profilesHtml += cardHtml; else singlesHtml += cardHtml;
             });
+            
             singleList.innerHTML = singlesHtml || '<div class="empty-msg">لا توجد تحاليل فردية</div>';
             profileList.innerHTML = profilesHtml || '<div class="empty-msg">لا توجد تحاليل مركبة</div>';
+            
             setTimeout(() => {
                 const firstInput = document.querySelector('.test-item input:not([readonly]), .test-item select');
                 if(firstInput) firstInput.focus();
             }, 100);
-        }
-
+        }        // ==== التنقل بالكيبورد ====
         function handleEnter(e, el, vtId, isProfile) {
             let form = el.closest('.test-body');
             let inputs = Array.from(form.querySelectorAll('input:not([readonly]), select'));
@@ -434,6 +531,7 @@
             }
         }
 
+        // ==== الحسابات التلقائية ====
         function triggerCalc(visitTestId, testCode) {
             const catalogItem = testsCatalog.find(c => c.code === testCode);
             if (!catalogItem) return;
@@ -485,6 +583,7 @@
             });
         }
 
+        // ==== حفظ النتائج (Offline-First) ====
         async function saveTestResult(visitTestId, isProfile, isSilent = false) {
             const vt = visitTests.find(v => v.id === visitTestId);
             const catalogItem = testsCatalog.find(c => c.code === vt.test_code) || { code: vt.test_code, parameters: [] };
@@ -512,19 +611,141 @@
                 return;
             }
 
+            // 1. لو مفيش نت -> حفظ محلي
+            if (!navigator.onLine) {
+                await db.offline_results.put({
+                    visitTestId: visitTestId,
+                    visitId: vt.visit_id,
+                    resultsData: resultsData,
+                    tenant_id: TEBA_CONFIG.tenant.id // ID ديناميكي
+                });
+                document.getElementById('syncBtn').style.display = 'flex';
+                if (!isSilent) showToast('⚠️ النت مقطوع! تم الحفظ محلياً. سيتم المزامنة لاحقاً.', true);
+                const existingIndex = testResults.findIndex(r => r.visit_test_id === visitTestId);
+                if (existingIndex > -1) testResults[existingIndex].results_data = resultsData;
+                else testResults.push({ visit_test_id: visitTestId, results_data: resultsData });
+                return;
+            }
+
+            // 2. لو فيه نت -> حفظ في السحابة
             const { error } = await _supabase.from('test_results').upsert({
+                tenant_id: TEBA_CONFIG.tenant.id, // ID ديناميكي
                 visit_test_id: visitTestId,
                 results_data: resultsData
             }, { onConflict: 'visit_test_id' });
 
             if (error) return alert('خطأ: ' + error.message);
+            
             const existingIndex = testResults.findIndex(r => r.visit_test_id === visitTestId);
             if (existingIndex > -1) testResults[existingIndex].results_data = resultsData;
             else testResults.push({ visit_test_id: visitTestId, results_data: resultsData });
+            
             if (!isSilent) showToast('✅ تم الحفظ بنجاح');
             else showToast('💾 تم الحفظ تلقائياً');
         }
 
+        // ==== الإضافة السريعة للباراميتر (الميزة الجديدة) ====
+        function openQuickAddModal(vtId, testCode) {
+            document.getElementById('qaVisitTestId').value = vtId;
+            document.getElementById('qaTestCode').value = testCode;
+            document.getElementById('qaParamName').value = '';
+            document.getElementById('qaParamValue').value = '';
+            document.getElementById('qaParamUnit').value = '';
+            document.getElementById('quickAddModal').style.display = 'flex';
+            document.getElementById('qaParamName').focus();
+        }
+
+        async function saveQuickAddParam() {
+            const vtId = document.getElementById('qaVisitTestId').value;
+            const testCode = document.getElementById('qaTestCode').value;
+            const paramName = document.getElementById('qaParamName').value.trim();
+            const paramValue = document.getElementById('qaParamValue').value.trim();
+            const paramUnit = document.getElementById('qaParamUnit').value.trim();
+
+            if (!paramName || !paramValue) return alert('يرجى إدخال اسم الباراميتر والنتيجة!');
+
+            const btn = document.querySelector('#quickAddModal .btn-save-test');
+            btn.innerText = '⏳...'; btn.disabled = true;
+
+            try {
+                // 1. تحديث الكتالوج عشان الباراميتر يظهر لكل المرضى الجايين (لنفس المعمل)
+                const catalogItem = testsCatalog.find(c => c.code === testCode);
+                if (catalogItem) {
+                    let currentParams = catalogItem.parameters || [];
+                    if (!currentParams.find(p => p.name.toLowerCase() === paramName.toLowerCase())) {
+                        currentParams.push({
+                            name: paramName,
+                            label: paramName,
+                            unit: paramUnit,
+                            type: 'text'
+                        });
+                        await _supabase.from('tests_catalog').update({ parameters: currentParams }).eq('id', catalogItem.id).eq('tenant_id', TEBA_CONFIG.tenant.id);
+                        catalogItem.parameters = currentParams; 
+                    }
+                }
+
+                // 2. حفظ النتيجة للمريض الحالي
+                const result = testResults.find(r => r.visit_test_id == vtId);
+                let resultsData = result ? result.results_data : {};
+                resultsData[paramName] = { value: paramValue };
+
+                await _supabase.from('test_results').upsert({
+                    tenant_id: TEBA_CONFIG.tenant.id,
+                    visit_test_id: vtId,
+                    results_data: resultsData
+                }, { onConflict: 'visit_test_id' });
+
+                // 3. إعادة رسم الكروت عشان الباراميتر الجديد يظهر
+                document.getElementById('quickAddModal').style.display = 'none';
+                await loadData(); 
+                selectPatient(selectedVisitId);
+                showToast('✅ تم إضافة الباراميتر وحفظ النتيجة');
+
+            } catch(err) {
+                alert('❌ خطأ: ' + err.message);
+            } finally {
+                btn.innerText = '💾 حفظ وإضافة'; btn.disabled = false;
+            }
+        }
+
+        // ==== مزامنة البيانات المحفوظة أوفلاين ====
+        async function syncOfflineData() {
+            const pending = await db.offline_results.toArray();
+            if (pending.length === 0) {
+                showToast('✅ لا توجد بيانات معلقة للمزامنة.');
+                document.getElementById('syncBtn').style.display = 'none';
+                return;
+            }
+            if (!navigator.onLine) return alert('لا يوجد اتصال بالإنترنت! يرجى توصيل النت أولاً.');
+
+            const btn = document.getElementById('syncBtn');
+            btn.innerText = '⏳ جاري المزامنة...';
+            
+            let successCount = 0;
+            for (let p of pending) {
+                try {
+                    const { error } = await _supabase.from('test_results').upsert({
+                        tenant_id: p.tenant_id,
+                        visit_test_id: p.visitTestId,
+                        results_data: p.resultsData
+                    }, { onConflict: 'visit_test_id' });
+                    
+                    if (!error) {
+                        await db.offline_results.delete(p.id);
+                        successCount++;
+                    }
+                } catch(e) { console.error("Sync error for result", p.id, e); }
+            }
+
+            if (successCount > 0) showToast(`✅ تم مزامنة ${successCount} نتيجة بنجاح!`);
+            if (await db.offline_results.count() === 0) btn.style.display = 'none';
+            else btn.innerText = '🔄 مزامنة البيانات';
+            
+            await loadData();
+            if (selectedVisitId) selectPatient(selectedVisitId);
+        }
+
+        // ==== النشر والحذف ====
         async function publishVisit() {
             if (!selectedVisitId) return;
             const visitObj = allVisits.find(v => v.visit_id === selectedVisitId);
@@ -541,7 +762,7 @@
                 const { error } = await _supabase.from('visits').update({
                     is_published: true,
                     published_at: new Date().toISOString()
-                }).eq('visit_id', selectedVisitId);
+                }).eq('visit_id', selectedVisitId).eq('tenant_id', TEBA_CONFIG.tenant.id);
                 if (error) throw error;
                 visitObj.is_published = true;
                 visitObj.published_at = new Date().toISOString();
@@ -555,8 +776,8 @@
         async function deleteVisitTest(visitTestId, visitId) {
             if(!confirm('هل أنت متأكد من حذف هذا التحليل نهائياً من الطلب؟')) return;
             try {
-                await _supabase.from('test_results').delete().eq('visit_test_id', visitTestId);
-                await _supabase.from('visit_tests').delete().eq('id', visitTestId);
+                await _supabase.from('test_results').delete().eq('visit_test_id', visitTestId).eq('tenant_id', TEBA_CONFIG.tenant.id);
+                await _supabase.from('visit_tests').delete().eq('id', visitTestId).eq('tenant_id', TEBA_CONFIG.tenant.id);
                 const index = testResults.findIndex(r => r.visit_test_id === visitTestId);
                 if(index > -1) testResults.splice(index, 1);
                 const vtIndex = visitTests.findIndex(v => v.id === visitTestId);
@@ -566,6 +787,7 @@
             } catch (err) { alert('خطأ: ' + err.message); }
         }
 
+        // ==== إضافة تحليل جديد للمريض ====
         function openAddTestModal() {
             if(!selectedVisitId) return alert('اختر مريضاً أولاً!');
             document.getElementById('addTestModal').style.display = 'flex';
@@ -584,7 +806,7 @@
                 return;
             }
             container.innerHTML = available.map(t => `
-                <button class="btn btn-primary" style="text-align: right; padding: 10px;" onclick="addTestToVisit('${t.code}', '${t.name}')">
+                <button class="btn btn-primary" style="text-align: right; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer;" onclick="addTestToVisit('${t.code}', '${t.name}')">
                     ${t.name} (${t.code})
                 </button>
             `).join('');
@@ -593,7 +815,12 @@
         async function addTestToVisit(code, name) {
             if(!selectedVisitId) return;
             try {
-                const { error } = await _supabase.from('visit_tests').insert([{ visit_id: selectedVisitId, test_code: code, price_at_time: 0 }]);
+                const { error } = await _supabase.from('visit_tests').insert([{ 
+                    tenant_id: TEBA_CONFIG.tenant.id,
+                    visit_id: selectedVisitId, 
+                    test_code: code, 
+                    price_at_time: 0 
+                }]);
                 if(error) throw error;
                 await loadData(); 
                 selectPatient(selectedVisitId);
@@ -602,6 +829,7 @@
             } catch(err) { alert('خطأ في الإضافة: ' + err.message); }
         }
 
+        // ==== الطباعة ====
         function getHeaderHtml(visit, reqDate, printDate) {
             let ageStr = visit.patient.age + ' Years';
             if(visit.patient.age_type === 'Months') ageStr = visit.patient.age + ' Months';
@@ -614,7 +842,7 @@
                         <p style="margin: 2px 0 0 0; font-size: 14px; color: #333;">${TEBA_CONFIG.lab.doctor}</p>
                     </div>
                     <div style="width: 50%; display: flex; justify-content: flex-end;">
-                        <img src="${TEBA_CONFIG.lab.logo}" alt="Logo" style="max-height: 90px; object-fit: contain;" onerror="this.style.display='none'">
+                        <img src="../header.png" alt="Logo" style="max-height: 90px; object-fit: contain;" onerror="this.style.display='none'">
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; border: 1.5px solid #000; padding: 10px 15px; border-radius: 4px; background: #fff; font-size: 13px; margin-bottom: 20px; z-index: 2; position: relative;">
@@ -634,7 +862,7 @@
 
         function getFooterHtml() {
             return `
-                <div class="print-footer">
+                <div class="print-footer" style="margin-top: auto;">
                     <div style="width: 40%; text-align: left; direction: ltr;">
                         <p style="margin: 4px 0; font-weight: bold; font-size: 13px; color: #000;">Tel: ${TEBA_CONFIG.lab.phone}</p>
                         <p style="margin: 4px 0; font-weight: bold; font-size: 13px; color: #000;">WhatsApp: ${TEBA_CONFIG.lab.whatsapp}</p>
@@ -743,7 +971,26 @@
             document.getElementById('printModal').style.display = 'flex';
         }
 
-        window.onload = loadData;
+        // ==== التشغيل ====
+        window.onload = async () => { 
+            await loadData(); 
+            if (await db.offline_results.count() > 0) {
+                document.getElementById('syncBtn').style.display = 'flex';
+                showToast('⚠️ يوجد نتائج محفوظة محلياً لم تتم مزامنتها بعد.', true);
+            }
+        };
     </script>
+
+    <!-- سكريبت تفعيل الـ PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('../service-worker.js')
+            .then(reg => console.log('✅ Service Worker Registered'))
+            .catch(err => console.warn('SW registration failed:', err));
+        });
+      }
+    </script>
+
 </body>
 </html>

@@ -1,5 +1,5 @@
 ﻿/* =====================================================
-   TEBA LABS - Admin Logic (v65 - Full Merge)
+   TEBA LABS - Admin Logic (v67 - Supabase Auth)
    ===================================================== */
 
 (function(){
@@ -10,18 +10,8 @@
   const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
   /* ============= SECURITY CONSTANTS ============= */
-  const SESSION_KEY = 'teba_admin_session';
-  const SESSION_TS_KEY = 'teba_admin_session_ts';
-  const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
-  const PWD_HASH_KEY = 'teba_admin_pwd_hash';
-  const PWD_SALT_KEY = 'teba_admin_pwd_salt';
-  const FAIL_COUNT_KEY = 'teba_admin_fail_count';
-  const LOCK_UNTIL_KEY = 'teba_admin_lock_until';
-  const MAX_FAILS = 5;
-  const LOCK_DURATION = 15 * 60 * 1000;
-  const DEFAULT_PASSWORD = 'teba2026admin';
   const MAX_FILE_SIZE = 20 * 1024 * 1024;
-  const BACKUP_VERSION = 'v65';
+  const BACKUP_VERSION = 'v67';
 
   let salesWorkbook = null;
   let pricesWorkbook = null;
@@ -133,45 +123,6 @@
   function calcMedian(arr) { if (!arr || arr.length === 0) return 0; const s = [...arr].sort((a,b) => a-b); const mid = Math.floor(s.length / 2); return s.length % 2 ? s[mid] : (s[mid-1] + s[mid]) / 2; }
   function growthInfo(current, previous) { if (previous <= 0 || current <= 0) return { pct: 0, label: '—', color: '#94a3b8', icon: '' }; const pct = ((current - previous) / previous) * 100; return { pct, label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, color: pct >= 0 ? '#4ade80' : '#f87171', icon: pct >= 0 ? '↑' : '↓' }; }
 
-  /* ============= CRYPTO ============= */
-  async function pbkdf2(password, salt, iterations) {
-    iterations = iterations || 100000;
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(salt), iterations, hash: 'SHA-256' }, key, 256);
-    return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  function genSalt() { const arr = new Uint8Array(16); crypto.getRandomValues(arr); return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join(''); }
-  async function getStoredPasswordHash() {
-    let hash = localStorage.getItem(PWD_HASH_KEY); let salt = localStorage.getItem(PWD_SALT_KEY);
-    if (!hash || !salt) { salt = genSalt(); hash = await pbkdf2(DEFAULT_PASSWORD, salt); localStorage.setItem(PWD_HASH_KEY, hash); localStorage.setItem(PWD_SALT_KEY, salt); }
-    return { hash, salt };
-  }
-  async function verifyPassword(input) { const stored = await getStoredPasswordHash(); const inputHash = await pbkdf2(input, stored.salt); return inputHash === stored.hash; }
-  async function setNewPassword(newPwd) { const salt = genSalt(); const hash = await pbkdf2(newPwd, salt); localStorage.setItem(PWD_HASH_KEY, hash); localStorage.setItem(PWD_SALT_KEY, salt); }
-
-  /* ============= SESSION ============= */
-  function setSession() { sessionStorage.setItem(SESSION_KEY, 'yes'); sessionStorage.setItem(SESSION_TS_KEY, String(Date.now())); }
-  function isSessionValid() {
-    if (sessionStorage.getItem(SESSION_KEY) !== 'yes') return false;
-    const ts = parseInt(sessionStorage.getItem(SESSION_TS_KEY) || '0', 10);
-    if (!ts || Date.now() - ts > SESSION_TIMEOUT) { clearSession(); return false; }
-    sessionStorage.setItem(SESSION_TS_KEY, String(Date.now())); return true;
-  }
-  function clearSession() { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_TS_KEY); }
-
-  /* ============= RATE LIMITING ============= */
-  function isLocked() { const until = parseInt(localStorage.getItem(LOCK_UNTIL_KEY) || '0', 10); return Date.now() < until; }
-  function getLockRemainingMin() { const until = parseInt(localStorage.getItem(LOCK_UNTIL_KEY) || '0', 10); return Math.max(0, Math.ceil((until - Date.now()) / 60000)); }
-  function recordFail() {
-    let count = parseInt(localStorage.getItem(FAIL_COUNT_KEY) || '0', 10) + 1;
-    localStorage.setItem(FAIL_COUNT_KEY, String(count));
-    if (count >= MAX_FAILS) { localStorage.setItem(LOCK_UNTIL_KEY, String(Date.now() + LOCK_DURATION)); localStorage.setItem(FAIL_COUNT_KEY, '0'); return true; }
-    return false;
-  }
-  function resetFails() { localStorage.removeItem(FAIL_COUNT_KEY); localStorage.removeItem(LOCK_UNTIL_KEY); }
-  function getFailsLeft() { return MAX_FAILS - parseInt(localStorage.getItem(FAIL_COUNT_KEY) || '0', 10); }
-
   /* ============= VALIDATION & LOADING ============= */
   function validateFile(file) {
     if (!file) return { ok: false, msg: '❌ لم يتم اختيار ملف' };
@@ -221,7 +172,7 @@
     el.innerHTML = `📅 آخر تحديث: ${date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   }
 
-  /* ============= BACKUP / RESTORE & PASSWORD ============= */
+  /* ============= BACKUP / RESTORE ============= */
   window.exportBackup = async function() {
     showLoading('جاري تصدير النسخة الاحتياطية...');
     try {
@@ -232,7 +183,7 @@
         const buf = await new Promise((res, rej) => { const r = store.get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
         if (buf) { const bytes = new Uint8Array(buf); let bin = ''; for (let j = 0; j < bytes.length; j++) bin += String.fromCharCode(bytes[j]); backup.files[k] = btoa(bin); }
       }
-      backup.settings.pwdHash = localStorage.getItem(PWD_HASH_KEY); backup.settings.pwdSalt = localStorage.getItem(PWD_SALT_KEY); backup.settings.lastUpload = localStorage.getItem('teba_last_upload_date');
+      backup.settings.lastUpload = localStorage.getItem('teba_last_upload_date');
       const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' }); const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'teba-backup-' + new Date().toISOString().slice(0, 10) + '.json'; a.click(); URL.revokeObjectURL(url);
       hideLoading(); alert('✅ تم تصدير النسخة الاحتياطية');
@@ -251,11 +202,7 @@
         const db = await openDB(); const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); store.clear();
         for (const [k, b64] of Object.entries(backup.files)) { const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j); store.put(arr.buffer, k); }
         await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
-        if (backup.settings) {
-          if (backup.settings.pwdHash) localStorage.setItem(PWD_HASH_KEY, backup.settings.pwdHash);
-          if (backup.settings.pwdSalt) localStorage.setItem(PWD_SALT_KEY, backup.settings.pwdSalt);
-          if (backup.settings.lastUpload) localStorage.setItem('teba_last_upload_date', backup.settings.lastUpload);
-        }
+        if (backup.settings && backup.settings.lastUpload) localStorage.setItem('teba_last_upload_date', backup.settings.lastUpload);
         hideLoading(); alert('✅ تم الاستيراد. الصفحة هتعيد التحميل.'); setTimeout(() => location.reload(), 500);
       } catch(e) { hideLoading(); alert('❌ خطأ: ' + e.message); }
     };
@@ -263,12 +210,18 @@
   };
 
   window.changeAdminPassword = async function() {
-    const oldPwd = prompt('كلمة المرور الحالية:'); if (!oldPwd) return;
-    if (!await verifyPassword(oldPwd)) { alert('❌ كلمة المرور غلط'); return; }
     const newPwd = prompt('كلمة المرور الجديدة (8+ أحرف، حروف وأرقام):'); if (!newPwd) return;
     const v = validatePasswordStrength(newPwd); if (!v.ok) { alert(v.msg); return; }
     const confirmPwd = prompt('أكد كلمة المرور:'); if (newPwd !== confirmPwd) { alert('❌ مش متطابقتين'); return; }
-    await setNewPassword(newPwd); alert('✅ تم التغيير. هتحتاج تسجل دخول من جديد.'); clearSession(); setTimeout(() => location.reload(), 800);
+    
+    showLoading('جاري تحديث كلمة المرور...');
+    try {
+      const { error } = await _supabase.auth.updateUser({ password: newPwd });
+      if (error) throw error;
+      hideLoading(); alert('✅ تم تغيير كلمة المرور بنجاح!');
+    } catch(err) {
+      hideLoading(); alert('❌ خطأ: ' + err.message);
+    }
   };
 
   /* ============= REPORT NAVIGATION ============= */
@@ -307,22 +260,42 @@
   }
 
   window.checkAdminPassword = async function(){
-    const input = document.getElementById('adminPassword'); const error = document.getElementById('loginError'); const btn = document.querySelector('.login-box button');
-    if (!input || !error) return;
-    if (isLocked()) { error.textContent = '🔒 الحساب مقفول. حاول بعد ' + getLockRemainingMin() + ' دقيقة.'; return; }
+    const emailInput = document.getElementById('adminEmail');
+    const passInput = document.getElementById('adminPassword');
+    const error = document.getElementById('loginError'); 
+    const btn = document.querySelector('.login-box button');
+    
+    if (!emailInput || !passInput || !error) return;
+    
     if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحقق...'; }
+    error.textContent = '';
+
     try {
-      const ok = await verifyPassword(input.value);
-      if (ok) { resetFails(); setSession(); await showDashboard(); }
-      else {
-        const locked = recordFail();
-        error.textContent = locked ? '🔒 5 محاولات فاشلة — الحساب مقفول 15 دقيقة.' : '❌ كلمة المرور غير صحيحة (متبقي ' + getFailsLeft() + ' محاولة)';
-        input.value = ''; setTimeout(() => { if (!isLocked()) error.textContent = ''; }, 3000);
+      const { data, error: authError } = await _supabase.auth.signInWithPassword({
+        email: emailInput.value.trim(),
+        password: passInput.value
+      });
+
+      if (authError) {
+        throw new Error(authError.message);
       }
-    } catch(e) { error.textContent = '❌ خطأ: ' + e.message; } finally { if (btn) { btn.disabled = false; btn.textContent = 'دخول'; } }
+
+      passInput.value = ''; 
+      // showDashboard() will be called by onAuthStateChange
+
+    } catch(err) {
+      error.textContent = '❌ ' + err.message;
+      passInput.value = '';
+      setTimeout(() => { error.textContent = ''; }, 4000);
+    } finally { 
+      if (btn) { btn.disabled = false; btn.textContent = 'دخول'; } 
+    }
   };
 
-  window.logoutAdmin = function(){ clearSession(); location.reload(); };
+  window.logoutAdmin = async function(){ 
+    await _supabase.auth.signOut(); 
+    // location.reload() will be called by onAuthStateChange
+  };
 
   window.clearData = async function() {
     if (!confirm('⚠️ مسح كل البيانات المحفوظة نهائياً؟')) return;
@@ -501,7 +474,7 @@
       return combinedList;
     }
   }  /* ==============================================================
-     الدوال الجديدة الخاصة بالمطابقة واللايف (المرحلة 6 و 7)
+     الدوال الخاصة بالمطابقة واللايف (Multi-Tenant Enabled)
      ============================================================== */
   window.renderReconciliation = async function() {
     if (!salesWorkbook) {
@@ -519,7 +492,9 @@
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
       
+      // إضافة فلتر الـ tenant_id
       let query = _supabase.from('visits').select('*')
+        .eq('tenant_id', TEBA_CONFIG.tenant.id)
         .gte('visit_date', startDate.toISOString())
         .lte('visit_date', endDate.toISOString());
       
@@ -570,7 +545,12 @@
       diffRevEl.style.color = diffColor;
       diffCasesEl.style.color = diffColor;
 
-      const { data: approval } = await _supabase.from('monthly_approvals').select('*').eq('year', year).eq('month', month).single();
+      // إضافة فلتر الـ tenant_id في جلب الاعتماد
+      const { data: approval } = await _supabase.from('monthly_approvals').select('*')
+        .eq('tenant_id', TEBA_CONFIG.tenant.id)
+        .eq('year', year)
+        .eq('month', month)
+        .single();
       
       const approvalArea = document.getElementById('recon-approval-area');
       if (approval) {
@@ -593,20 +573,16 @@
   };
 
   window.approveMonth = async function(year, month) {
-    const pwd = prompt('لإعتماد الشهر، أدخل باسورد الطبيب (999):');
-    if (pwd !== TEBA_CONFIG.auth.doctorPassword) {
-      if(pwd !== null) alert('❌ باسورد خطأ!');
-      return;
-    }
-
+    if (!confirm('هل أنت متأكد من اعتماد هذا الشهر؟')) return;
     showLoading('جاري حفظ الاعتماد...');
     try {
       const { error } = await _supabase.from('monthly_approvals').upsert({
+        tenant_id: TEBA_CONFIG.tenant.id,
         year: parseInt(year),
         month: parseInt(month),
         approved_by: TEBA_CONFIG.lab.doctor,
         status: 'approved'
-      }, { onConflict: 'year,month' });
+      }, { onConflict: 'tenant_id,year,month' });
 
       if (error) throw error;
       alert('✅ تم اعتماد الشهر بنجاح!');
@@ -621,7 +597,9 @@
   async function renderYearGrid(year) {
     const grid = document.getElementById('recon-year-grid');
     grid.innerHTML = 'جاري التحميل...';
-    const { data: approvals } = await _supabase.from('monthly_approvals').select('month').eq('year', year);
+    const { data: approvals } = await _supabase.from('monthly_approvals').select('month')
+      .eq('tenant_id', TEBA_CONFIG.tenant.id)
+      .eq('year', year);
     const approvedMonths = (approvals || []).map(a => a.month);
     const monthsAr = ['يناير','فبراير','مارس','ابريل','مايو','يونيو','يوليو','اغسطس','سبتمبر','اكتوبر','نوفمبر','ديسمبر'];
     grid.innerHTML = monthsAr.map((name, idx) => {
@@ -652,8 +630,9 @@
     try {
       const today = new Date(); today.setHours(0,0,0,0); const todayISO = today.toISOString();
       
-      let casesQuery = _supabase.from('visits').select('*', { count: 'exact', head: true }).gte('visit_date', todayISO);
-      let visitsQuery = _supabase.from('visits').select('visit_id').gte('visit_date', todayISO);
+      // إضافة فلتر الـ tenant_id
+      let casesQuery = _supabase.from('visits').select('*', { count: 'exact', head: true }).eq('tenant_id', TEBA_CONFIG.tenant.id).gte('visit_date', todayISO);
+      let visitsQuery = _supabase.from('visits').select('visit_id').eq('tenant_id', TEBA_CONFIG.tenant.id).gte('visit_date', todayISO);
       
       if (branchFilter === 'jaafara') {
         casesQuery = casesQuery.eq('branch_id', 1);
@@ -669,32 +648,32 @@
       let testsCount = 0;
       if (todayVisits && todayVisits.length > 0) {
         const vIds = todayVisits.map(v => v.visit_id);
-        const { count: tCount } = await _supabase.from('visit_tests').select('*', { count: 'exact', head: true }).in('visit_id', vIds);
+        const { count: tCount } = await _supabase.from('visit_tests').select('*', { count: 'exact', head: true }).eq('tenant_id', TEBA_CONFIG.tenant.id).in('visit_id', vIds);
         testsCount = tCount || 0;
       }
 
       let pendingCount = 0;
       if (branchFilter === 'combined') {
-        const { data: allVT } = await _supabase.from('visit_tests').select('id');
-        const { data: allRes } = await _supabase.from('test_results').select('visit_test_id');
+        const { data: allVT } = await _supabase.from('visit_tests').select('id').eq('tenant_id', TEBA_CONFIG.tenant.id);
+        const { data: allRes } = await _supabase.from('test_results').select('visit_test_id').eq('tenant_id', TEBA_CONFIG.tenant.id);
         const resIds = new Set((allRes || []).map(r => r.visit_test_id));
         pendingCount = (allVT || []).filter(vt => !resIds.has(vt.id)).length;
       } else {
         const bId = branchFilter === 'jaafara' ? 1 : 2;
-        const { data: branchVisits } = await _supabase.from('visits').select('visit_id').eq('branch_id', bId);
+        const { data: branchVisits } = await _supabase.from('visits').select('visit_id').eq('tenant_id', TEBA_CONFIG.tenant.id).eq('branch_id', bId);
         const bvIds = (branchVisits || []).map(v => v.visit_id);
         if (bvIds.length > 0) {
-          const { data: allVT } = await _supabase.from('visit_tests').select('id').in('visit_id', bvIds);
+          const { data: allVT } = await _supabase.from('visit_tests').select('id').eq('tenant_id', TEBA_CONFIG.tenant.id).in('visit_id', bvIds);
           const vtIds = (allVT || []).map(v => v.id);
           if (vtIds.length > 0) {
-            const { data: allRes } = await _supabase.from('test_results').select('visit_test_id').in('visit_test_id', vtIds);
+            const { data: allRes } = await _supabase.from('test_results').select('visit_test_id').eq('tenant_id', TEBA_CONFIG.tenant.id).in('visit_test_id', vtIds);
             const resIds = new Set((allRes || []).map(r => r.visit_test_id));
             pendingCount = (allVT || []).filter(vt => !resIds.has(vt.id)).length;
           }
         }
       }
 
-      let pubQuery = _supabase.from('visits').select('*', { count: 'exact', head: true }).eq('is_published', true).gte('published_at', todayISO);
+      let pubQuery = _supabase.from('visits').select('*', { count: 'exact', head: true }).eq('tenant_id', TEBA_CONFIG.tenant.id).eq('is_published', true).gte('published_at', todayISO);
       if (branchFilter === 'jaafara') pubQuery = pubQuery.eq('branch_id', 1);
       if (branchFilter === 'bahtim') pubQuery = pubQuery.eq('branch_id', 2);
       const { count: pubCount } = await pubQuery;
@@ -711,7 +690,7 @@
   };
 
   /* ==============================================================
-     التقارير الكبيرة (المرحلة 5 و 6)
+     التقارير الكبيرة
      ============================================================== */
   window.renderMonthlyAdvisor = function() {
     const container = document.getElementById('advisorReport');
@@ -784,9 +763,7 @@
     const alertsHtml = alerts.length > 0 ? `<div class="advisor-alert-critical"><h4>🚨 تنبيهات حرجة</h4>${alerts.map(a => `<div class="advisor-alert-item">${a}</div>`).join('')}</div>` : '';
     
     container.innerHTML = messageHtml + finCompareHtml + branchCompareHtml + testsHtml + alertsHtml;
-  };
-
-  function buildWeeklyPlan(ctx) {
+  };  function buildWeeklyPlan(ctx) {
     const weeks = [];
     const { refMonthName, refMargin, refExp, losingTests, sleepingTests, topSellers, refRev, refExpRatio, avgInvoice, jRevGrowth, bRevGrowth, refJMargin, refBMargin } = ctx;
     const weakerBranch = refJMargin < refBMargin ? 'الجعافرة' : 'بهتيم';
@@ -1107,9 +1084,7 @@
     const profCtx = profCanvas.getContext('2d');
     if (window.anProfChart) window.anProfChart.destroy();
     window.anProfChart = new Chart(profCtx, { type: 'line', data: { labels: labels, datasets: [{ label: 'صافي الربح', data: profits, backgroundColor: 'rgba(217, 119, 6, 0.5)', borderColor: '#d97706', borderWidth: 3, fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: textColor } } }, scales: { y: { ticks: { color: gridColor } }, x: { ticks: { color: gridColor } } } } });
-  };
-
-  window.renderCaseAnalysis = function() {
+  };  window.renderCaseAnalysis = function() {
     const selectedYear = document.getElementById('casesYearSelector').value;
     const selectedBranch = document.getElementById('casesBranchSelector').value;
     const months = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -1620,17 +1595,25 @@
 
   /* ============= INIT ============= */
   initTheme();
-  if(isSessionValid()) showDashboard();
+  
+  _supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      showDashboard();
+    }
+  });
+
+  _supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN') {
+      showDashboard();
+    } else if (event === 'SIGNED_OUT') {
+      location.reload();
+    }
+  });
+
   const passInput = document.getElementById('adminPassword');
   if(passInput) passInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') window.checkAdminPassword(); });
-  ['click', 'keydown', 'scroll', 'touchstart'].forEach(function(evt){
-    document.addEventListener(evt, function(){
-      if (sessionStorage.getItem(SESSION_KEY) !== 'yes') return;
-      const ts = parseInt(sessionStorage.getItem(SESSION_TS_KEY) || '0', 10);
-      if (Date.now() - ts > SESSION_TIMEOUT) { clearSession(); alert('⏱️ انتهت الجلسة.'); location.reload(); return; }
-      sessionStorage.setItem(SESSION_TS_KEY, String(Date.now()));
-    }, { passive: true });
-  });
+  const emailInput = document.getElementById('adminEmail');
+  if(emailInput) emailInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') window.checkAdminPassword(); });
 
   /* ============= PWA INSTALL LOGIC ============= */
   let deferredPrompt;

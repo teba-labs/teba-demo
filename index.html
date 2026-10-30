@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>معامل طيبة | TEBA LABS</title>
 
+<!-- PWA Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22c55e">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap" rel="stylesheet">
@@ -12,8 +16,6 @@
   body, h1, h2, h3, h4, h5, p, a, button, input, select, textarea { font-family: 'Almarai', sans-serif !important; }
 </style>
 
-<meta name="theme-color" content="#0a0e0a">
-<link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="stylesheet" href="styles.css">
 
@@ -323,6 +325,17 @@
 <script src="features.js" defer></script>
 <script src="site_dynamic.js" defer></script>
 <script src="patient_portal.js" defer></script>
+
+<!-- سكريبت تفعيل الـ PWA -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(reg => console.log('✅ Service Worker Registered'))
+        .catch(err => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
 
 </body>
 </html>

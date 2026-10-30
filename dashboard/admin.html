@@ -15,7 +15,7 @@
 <link rel="preload" href="admin.css" as="style">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="admin.css">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="../manifest.json">
 <style>
   .chart-container { position: relative; height: 350px; width: 100%; margin-bottom: 20px; }
   @media (max-width: 768px) { .chart-container { height: 300px; } }
@@ -39,10 +39,11 @@
 
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <div class="login-logo"><img id="loginLogo" src="logo.png" alt="Logo" width="200" height="80" fetchpriority="high"></div>
+    <div class="login-logo"><img id="loginLogo" src="../logo.png" alt="Logo" width="200" height="80" fetchpriority="high"></div>
     <h2>لوحة التحكم</h2>
     <p id="loginLabName">جاري التحميل...</p>
-    <input type="password" id="adminPassword" placeholder="أدخل كلمة المرور" autocomplete="current-password">
+    <input type="email" id="adminEmail" placeholder="البريد الإلكتروني" autocomplete="username" style="margin-bottom: 10px; text-align: left; direction: ltr;">
+    <input type="password" id="adminPassword" placeholder="كلمة المرور" autocomplete="current-password">
     <button onclick="checkAdminPassword()">دخول</button>
     <div id="loginError" class="login-error"></div>
   </div>
@@ -113,9 +114,7 @@
       <ul class="admin-nav">
         <li><button data-report="security" onclick="showReport('security')">🛡️ النسخ الاحتياطي والأمان</button></li>
       </ul>
-    </aside>
-
-    <main class="admin-content">
+    </aside>    <main class="admin-content">
       
       <!-- تاب المطابقة الشهرية -->
       <section class="admin-section active" id="report-reconciliation">
@@ -160,7 +159,6 @@
           <h2>⚡ إحصائيات مباشرة من السحابة (Live)</h2>
         </div>
         
-        <!-- الفلتر اللي ضفناه -->
         <div class="filter-group">
           <div><label>الفرع:</label>
           <select id="liveBranchSelector" onchange="renderLiveStats()">
@@ -298,7 +296,7 @@
           <div class="security-card">
             <div class="security-icon">🔑</div>
             <h3>تغيير كلمة المرور</h3>
-            <p>غيّر باسورد لوحة التحكم (8+ أحرف، حروف وأرقام).</p>
+            <p>غيّر باسورد لوحة التحكم بأمان (متصل بـ Supabase Auth).</p>
             <button class="security-btn primary" onclick="changeAdminPassword()">🔐 تغيير كلمة المرور</button>
           </div>
           <div class="security-card">
@@ -312,7 +310,7 @@
         <div class="security-info">
           <h4>ℹ️ معلومات الأمان</h4>
           <ul>
-            <li>✅ كلمة المرور مشفّرة بـ PBKDF2 (100,000 دورة + SHA-256)</li>
+            <li>✅ النظام محمي بـ Supabase Auth (تسجيل دخول آمن)</li>
             <li>✅ قفل تلقائي بعد 5 محاولات فاشلة لمدة 15 دقيقة</li>
             <li>✅ انتهاء الجلسة تلقائياً بعد ساعتين من عدم النشاط</li>
             <li>✅ التحقق من صحة نوع وحجم الملفات قبل الرفع</li>
@@ -641,9 +639,7 @@
       </section>
     </main>
   </div>
-</div>
-
-<button class="ai-float-btn" onclick="openAIAssistant()" title="المحلل الذكي">🤖</button>
+</div><button class="ai-float-btn" onclick="openAIAssistant()" title="المحلل الذكي">🤖</button>
 
 <div id="aiModal" class="ai-modal">
   <div class="ai-modal-content">
@@ -663,9 +659,10 @@
 <script src="admin.js" defer></script>
 
 <script>
+  // تفعيل الـ Service Worker للـ PWA
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./service-worker.js')
+      navigator.serviceWorker.register('../service-worker.js')
         .then(function (reg) { console.log('✅ SW Registered from Admin'); })
         .catch(function (err) { console.warn('SW registration failed:', err); });
     });
@@ -675,6 +672,7 @@
   document.addEventListener("DOMContentLoaded", function() {
     if (typeof TEBA_CONFIG !== 'undefined') {
       document.title = "لوحة التحكم | " + TEBA_CONFIG.lab.name;
+      
       const loginLabName = document.getElementById('loginLabName');
       if(loginLabName) loginLabName.innerText = TEBA_CONFIG.lab.name + " - " + TEBA_CONFIG.lab.nameEn;
       

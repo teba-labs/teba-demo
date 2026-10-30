@@ -1,19 +1,22 @@
 ﻿/* =====================================================
-   TEBA LABS - Service Worker (v61 - True Cost)
+   TEBA LABS - Service Worker (v67 - Multi-Tenant Offline)
    ===================================================== */
 
-const CACHE_VERSION = 'v65'; 
+const CACHE_VERSION = 'v67'; 
 const STATIC_CACHE  = `teba-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `teba-runtime-${CACHE_VERSION}`;
 const CDN_CACHE     = `teba-cdn-${CACHE_VERSION}`;
 const IMG_CACHE     = `teba-img-${CACHE_VERSION}`;
 
+// التعديل هنا: ضفنا صفحات النظام والداشبورد واللوجو
 const PRECACHE_ASSETS = [
-  './', './index.html', './admin.html', './settings.html', 
+  './', './index.html', 
+  './system/home.html', './system/reception.html', './system/lab.html', './system/tests_manage.html',
+  './dashboard/admin.html', './dashboard/settings.html',
   './styles.css', './admin.css', 
   './data.js', './app.js', './features.js', './admin.js', 
   './site_dynamic.js', './patient_portal.js', './config.js',
-  './logo.png', './manifest.json'
+  './logo.png', './brand-logo.png', './manifest.json'
 ];
 
 const PRECACHE_CDN = [
@@ -40,7 +43,8 @@ function trimCache(name, max) {
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const sc = await caches.open(STATIC_CACHE);
-    await sc.addAll(PRECACHE_ASSETS).catch(e => console.warn(e));
+    // ضفنا catch عشان لو ملف واحد ناقص ميكسرش الكاش كله
+    await sc.addAll(PRECACHE_ASSETS).catch(e => console.warn('Precache assets error:', e));
     const cc = await caches.open(CDN_CACHE);
     await Promise.all(PRECACHE_CDN.map(url => cc.add(url).catch(e => console.warn(e))));
     await self.skipWaiting();
@@ -58,7 +62,9 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const { request } = event;
+  // لا تخزن طلبات الـ POST (زي الحفظ في الساب بيز)
   if (request.method !== 'GET') return;
+  
   const url = new URL(request.url);
 
   if (request.mode === 'navigate') {
